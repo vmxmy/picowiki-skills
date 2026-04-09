@@ -1,0 +1,23 @@
+{
+  "skill_name": "llm-wiki",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "帮我初始化一个 llm wiki，我想用它来跟踪我的 AI 研究笔记和论文阅读，vault 就用 ~/Documents/Obsidian Vault",
+      "expected_output": "Detects vault, confirms with user, creates full directory structure (raw/, wiki/sources/, wiki/concepts/, wiki/entities/, wiki/comparisons/, output/), generates SCHEMA.md customized for AI research domain, creates index.md and log.md with initialization entry",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "我把一篇关于 RAG 架构的文章放到了 raw/ 目录下，帮我处理一下。文章讲了几种 RAG 架构模式：naive RAG、advanced RAG、modular RAG，还有对 Fine-tuning 的对比",
+      "expected_output": "Reads raw source, creates source summary page in wiki/sources/, creates/updates wiki/concepts/rag-architectures.md, creates/updates wiki/concepts/fine-tuning.md, creates entity pages for mentioned tools/authors, updates index.md with all new pages, appends to log.md",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "帮我检查一下 wiki 的健康状况，然后告诉我目前 wiki 里关于 transformer 的内容有哪些",
+      "expected_output": "Runs lint workflow checking for contradictions/stale/orphans/gaps, then reads index.md to find transformer-related pages, reads relevant pages, synthesizes answer with wikilink citations, suggests any missing concepts or sources to add",
+      "files": []
+    }
+  ]
+}
