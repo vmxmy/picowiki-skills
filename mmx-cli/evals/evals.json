@@ -1,0 +1,23 @@
+{
+  "skill_name": "mmx-cli",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "用 MMX-CLI 生成一段语音，朗读「今天天气真好」",
+      "expected_output": "执行 mmx-cli generate speech 命令，生成 mp3 文件",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Agent 想在 Claude Code 里自动做视频，需要集成 MiniMax 视频生成，应该怎么用？",
+      "expected_output": "说明安装方式、命令调用方式、async 异步模式、以及 exit code 重试逻辑",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "MMX-CLI 相比 MCP Server 有什么优势？",
+      "expected_output": "指出接入成本低、全模态覆盖、原生 Agent 适配、语义化 Exit Code",
+      "files": []
+    }
+  ]
+}

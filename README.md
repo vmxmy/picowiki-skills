@@ -8,6 +8,7 @@ Claude Code skills for personal knowledge management and API integration.
 |-------|---------|---------------|
 | `llm-wiki` | Obsidian vault knowledge base following Karpathy's LLM Wiki pattern | ingest, query, lint |
 | `mptext-api` | WeChat public account article exporter API integration | search accounts, download articles |
+| `mmx-cli` | MiniMax full-modality CLI for AI Agents | video, speech, music, coding |
 
 ---
 
@@ -26,13 +27,13 @@ vault/
 ├── raw/              # 不可变原始文档（LLM 只读）
 ├── wiki/
 │   ├── sources/      # 每篇来源的摘要卡片
-│   ├── concepts/    # 概念/主题页
-│   ├── entities/    # 人物/组织/技术实体页
-│   └── comparisons/ # 分析与综合
-├── output/          # 查询结果与报告
-├── SCHEMA.md        # LLM 行为规则
-├── index.md         # 内容目录
-└── log.md           # 操作日志（仅追加）
+│   ├── concepts/     # 概念/主题页
+│   ├── entities/     # 人物/组织/技术实体页
+│   └── comparisons/  # 分析与综合
+├── output/           # 查询结果与报告
+├── SCHEMA.md         # LLM 行为规则
+├── index.md          # 内容目录
+└── log.md            # 操作日志（仅追加）
 ```
 
 ### Operations
@@ -123,6 +124,93 @@ curl -G "https://down.mptext.top/api/public/v1/account" \
 
 ---
 
+## mmx-cli
+
+MiniMax MMX-CLI — 面向 AI Agent 的全模态命令行工具。
+
+**项目地址**：https://github.com/MiniMax-AI/cli
+
+### What it does
+
+Agent 天然适合命令行模式（执行命令 → 拿到结果），MiniMax 将全模态能力通过 CLI 暴露给 Agent，无需适配接口、无需编写 MCP Server。
+
+核心价值：Agent 可独立完成完整工作流
+> 资料搜集 → 生成文案 → 合成语音旁白 → 配图配乐 → 视频制作
+
+### 安装
+
+```bash
+pip install mmx-cli
+# 或
+npm install -g mmx-cli
+```
+
+需要设置环境变量 `MINIMAX_API_KEY`。Token Plan：https://platform.minimax.com/subscribe/token-plan
+
+### Agent 优化设计
+
+| 特性 | 说明 |
+|------|------|
+| **输出隔离** | 进度条/彩色字符 → stderr；stdout 仅输出干净的文件路径或 JSON |
+| **语义化 Exit Code** | 失败时返回数字代号（1=通用错误, 2=鉴权失败, 3=参数错误, 4=超时, 5=网络异常），Agent 无需解析英文报错 |
+| **非阻塞/异步** | 参数缺失直接报错退出，不傻等输入；`--async` 支持长耗时任务后台执行 |
+
+### 主要命令
+
+```bash
+# 视频生成
+mmx-cli generate video "a cat playing piano" --duration 10 --output ./video.mp4 --quiet
+
+# 语音合成
+mmx-cli generate speech "你好，世界" --voice "female_warm" --output ./speech.mp3
+
+# 音乐创作
+mmx-cli generate music "a relaxing jazz piece" --output ./music.mp3
+
+# 编程模型
+mmx-cli chat "用 Python 写一个快速排序" --model coding
+
+# Token 用量查询
+mmx-cli usage
+```
+
+### 完整工作流示例
+
+Agent 自动制作视频介绍：
+
+```bash
+# 1. 生成文案
+mmx-cli chat "写一段 30 秒产品介绍文案" > script.txt
+
+# 2. 合成语音
+SCRIPT=$(cat script.txt)
+mmx-cli generate speech "$SCRIPT" --voice "female_pro" --output narration.mp3
+
+# 3. 生成配图视频
+mmx-cli generate video "产品功能演示，简洁现代风格" --output visuals.mp4
+
+# 4. 合并（需 ffmpeg）
+ffmpeg -i visuals.mp4 -i narration.mp3 -c:v copy -c:a aac final.mp4
+```
+
+### 与 MCP Server 对比
+
+| 维度 | MCP Server | MMX-CLI |
+|------|------------|---------|
+| 接入成本 | 需要编写 Server | 两行安装 |
+| 模型覆盖 | 单模型 | 全模态（视频/语音/音乐/编程） |
+| Agent 适配 | 需二次开发 | 原生支持 |
+| 交互模式 | Request/Response | 命令行 + Exit Code |
+
+### Trigger Keywords
+
+- `/mmx-cli`
+- "MiniMax"、"MMX"、"mmx-cli"、"视频生成"
+- "语音合成"、"音乐创作"、"全模态"
+- "minimax"、"token plan"
+
+---
+
 ## Installation
 
 ### 完整安装（所有 skills）
@@ -134,11 +222,9 @@ git clone https://github.com/vmxmy/picowiki-skills.git ~/.claude/skills/picowiki
 ### 单独安装某个 skill
 
 ```bash
-# llm-wiki
 ln -s ~/.claude/skills/picowiki-skills/llm-wiki ~/.claude/skills/llm-wiki
-
-# mptext-api
 ln -s ~/.claude/skills/picowiki-skills/mptext-api ~/.claude/skills/mptext-api
+ln -s ~/.claude/skills/picowiki-skills/mmx-cli ~/.claude/skills/mmx-cli
 ```
 
 ### 更新
