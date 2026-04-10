@@ -9,6 +9,7 @@ Claude Code skills for personal knowledge management and API integration.
 | `llm-wiki` | Obsidian vault knowledge base following Karpathy's LLM Wiki pattern | ingest, query, lint |
 | `mptext-api` | WeChat public account article exporter API integration | search accounts, download articles |
 | `mmx-cli` | MiniMax full-modality CLI for AI Agents | video, speech, music, coding |
+| `multi-agent-prompt-designer` | PicoClaw-native multi-agent mission prompt designer | doctor, recon, orchestration, watchdog |
 
 ---
 
@@ -71,6 +72,37 @@ sources:
   - "[[wiki/sources/来源页]]"
 ---
 ```
+
+---
+
+## multi-agent-prompt-designer
+
+PicoClaw 原生多 agent 任务 prompt 设计器。
+
+### What it does
+
+把用户目标转成一份可直接交给 PicoClaw 执行的完整任务 prompt，明确：
+- doctor 检查本地 MCP / CLI / skills
+- 前置调研与 baseline
+- agent 分工与 bounded mutation surface
+- `heartbeat` / `cron` 驱动的 watchdog
+- `spawn` / `SubTurn` / `spawn_status` / `steering` / `Continue()` 等原生机制优先
+- `SPEC.md` / `STATUS.json` / `EXECUTION_LOG.md` / `RESULTS.tsv` 追踪产物
+
+### Trigger Keywords
+
+- `/multi-agent-prompt-designer`
+- "设计多agent任务"
+- "生成多agent prompt"
+- "把目标拆成并行agent协作"
+- "PicoClaw 任务编排"
+- "高并发 agent 压测任务"
+
+### Included References
+
+- `references/runtime-patterns.md`
+- `references/prompt-templates.md`
+
 
 ---
 

@@ -1,0 +1,7 @@
+interface:
+  display_name: "PicoClaw Mission Prompt Designer"
+  short_description: "Design PicoClaw-native multi-agent mission prompts."
+  default_prompt: "Use $multi-agent-prompt-designer to turn my goal into a PicoClaw-native multi-agent orchestration prompt."
+
+policy:
+  allow_implicit_invocation: true
