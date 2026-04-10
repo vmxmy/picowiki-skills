@@ -1,0 +1,817 @@
+# Tushare Pro API 接口参数配置
+# 来源: 接口参数表_20260311_205353.doc
+# 更新: 2026-04-10
+#
+# 字段说明:
+#   desc:       接口描述
+#   permission: 最低积分要求
+#   rate_limit: 频率限制 (如 "500/min")
+#   max_rows:   单次最大返回行数
+#   update_time: 数据更新时间
+#   data_start: 数据起始日期
+#   inputs:     输入参数 (required: true/false)
+#   outputs:    输出参数 (default: 是否默认返回)
+#   notes:      使用注意事项
+#   examples:   调用示例
+
+interfaces:
+
+  # ============================================================
+  # 行情数据
+  # ============================================================
+
+  daily:
+    desc: A股日线行情(未复权), 停牌期间不提供数据
+    permission: 基础积分
+    rate_limit: 500/min
+    max_rows: 6000
+    inputs:
+      ts_code:    { type: str, required: false, desc: "股票代码(支持多个,逗号分隔)" }
+      trade_date: { type: str, required: false, desc: "交易日期 YYYYMMDD" }
+      start_date: { type: str, required: false, desc: "开始日期 YYYYMMDD" }
+      end_date:   { type: str, required: false, desc: "结束日期 YYYYMMDD" }
+    outputs:
+      ts_code:   { type: str,   desc: "股票代码" }
+      trade_date: { type: str,  desc: "交易日期" }
+      open:      { type: float, desc: "开盘价" }
+      high:      { type: float, desc: "最高价" }
+      low:       { type: float, desc: "最低价" }
+      close:     { type: float, desc: "收盘价" }
+      pre_close: { type: float, desc: "昨收价(除权价)" }
+      change:    { type: float, desc: "涨跌额" }
+      pct_chg:   { type: float, desc: "涨跌幅(基于除权后昨收)" }
+      vol:       { type: float, desc: "成交量(手)" }
+      amount:    { type: float, desc: "成交额(千元)" }
+    notes:
+      - "pct_chg 注意: daily接口返回 pct_chg, sw_daily接口返回 pct_change, 二者列名不同"
+    examples:
+      - "pro.daily(ts_code='000001.SZ', start_date='20180701', end_date='20180718')"
+      - "pro.daily(trade_date='20180810')"
+
+  weekly:
+    desc: A股周线行情, 每周最后一个交易日更新
+    permission: 2000
+    max_rows: 6000
+    inputs:
+      ts_code:    { type: str, required: false, desc: "TS代码(与trade_date二选一)" }
+      trade_date: { type: str, required: false, desc: "交易日期(每周最后一个交易日)" }
+      start_date: { type: str, required: false, desc: "开始日期" }
+      end_date:   { type: str, required: false, desc: "结束日期" }
+    outputs:
+      ts_code:    { type: str,   desc: "股票代码" }
+      trade_date: { type: str,   desc: "交易日期" }
+      open:       { type: float, desc: "周开盘价" }
+      high:       { type: float, desc: "周最高价" }
+      low:        { type: float, desc: "周最低价" }
+      close:      { type: float, desc: "周收盘价" }
+      pre_close:  { type: float, desc: "上周收盘价" }
+      change:     { type: float, desc: "周涨跌额" }
+      pct_chg:    { type: float, desc: "周涨跌幅(未复权)" }
+      vol:        { type: float, desc: "周成交量" }
+      amount:     { type: float, desc: "周成交额" }
+
+  monthly:
+    desc: A股月线行情
+    permission: 2000
+    max_rows: 4500
+    inputs:
+      ts_code:    { type: str, required: false, desc: "TS代码(与trade_date二选一)" }
+      trade_date: { type: str, required: false, desc: "交易日期(每月最后一个交易日)" }
+      start_date: { type: str, required: false, desc: "开始日期" }
+      end_date:   { type: str, required: false, desc: "结束日期" }
+    outputs: "同 weekly, 字段含义为月度"
+
+  stk_weekly_monthly:
+    desc: 股票周/月线行情(每日更新)
+    permission: 2000
+    max_rows: 6000
+    inputs:
+      ts_code:    { type: str, required: false, desc: "TS代码" }
+      trade_date: { type: str, required: false, desc: "交易日期" }
+      start_date: { type: str, required: false, desc: "开始交易日期" }
+      end_date:   { type: str, required: false, desc: "结束交易日期" }
+      freq:       { type: str, required: true,  desc: "频率 week周 / month月" }
+    outputs: "同 weekly, 额外包含 end_date(计算截至日) 和 freq(频率)"
+
+  stk_week_month_adj:
+    desc: 股票周/月线行情(复权, 每日更新)
+    permission: 2000
+    inputs: "同 stk_weekly_monthly"
+    outputs:
+      额外字段:
+        - "open_qfq/high_qfq/low_qfq/close_qfq: 前复权价格"
+        - "open_hfq/high_hfq/low_hfq/close_hfq: 后复权价格"
+        - "pre_close: 上周/月收盘价(除权价, 前复权)"
+
+  pro_bar:
+    desc: 通用行情接口(SDK>=1.2.26), 整合股票/指数/期货/基金/期权, 支持复权和分钟数据
+    permission: 基础积分
+    inputs:
+      ts_code:    { type: str,  required: true,  desc: "证券代码, 不支持多值" }
+      start_date: { type: str,  required: false, desc: "开始日期 YYYYMMDD" }
+      end_date:   { type: str,  required: false, desc: "结束日期 YYYYMMDD" }
+      asset:      { type: str,  required: true,  desc: "E股票 I沪深指数 C数字货币 FT期货 FD基金 O期权 CB可转债, 默认E" }
+      adj:        { type: str,  required: false, desc: "复权: None(默认) / qfq(前复权) / hfq(后复权)" }
+      freq:       { type: str,  required: true,  desc: "1/5/15/30/60min / D / W / M, 默认D" }
+      ma:         { type: list, required: false, desc: "均线周期, 支持任意int" }
+      factors:    { type: list, required: false, desc: "股票因子(asset=E有效): tor换手率 vr量比" }
+      adjfactor:  { type: str,  required: false, desc: "是否返回复权因子, 默认False" }
+    notes:
+      - "前复权: 当日收盘价 x 当日复权因子 / 最新复权因子"
+      - "后复权: 当日收盘价 x 当日复权因子"
+      - "ts_code不支持多值, 只能单只查询"
+    examples:
+      - "ts.pro_bar(ts_code='000001.SZ', adj='qfq', start_date='20180101', end_date='20181011')"
+      - "ts.pro_bar(ts_code='000001.SZ', freq='W', adj='qfq', start_date='20180101', end_date='20181011')"
+
+  adj_factor:
+    desc: 股票复权因子, 盘前9:15~20入库
+    permission: 2000
+    inputs:
+      ts_code:    { type: str, required: false, desc: "股票代码" }
+      trade_date: { type: str, required: false, desc: "交易日期 YYYYMMDD" }
+      start_date: { type: str, required: false, desc: "开始日期" }
+      end_date:   { type: str, required: false, desc: "结束日期" }
+    outputs:
+      ts_code:    { type: str,   desc: "股票代码" }
+      trade_date: { type: str,   desc: "交易日期" }
+      adj_factor: { type: float, desc: "复权因子" }
+
+  stk_limit:
+    desc: 全市场每日涨跌停价格(含A/B股和基金), 每交易日8:40更新
+    permission: 2000
+    max_rows: 5800
+    inputs:
+      ts_code:    { type: str, required: false, desc: "股票代码" }
+      trade_date: { type: str, required: false, desc: "交易日期" }
+      start_date: { type: str, required: false, desc: "开始日期" }
+      end_date:   { type: str, required: false, desc: "结束日期" }
+    outputs:
+      trade_date: { type: str,   desc: "交易日期" }
+      ts_code:    { type: str,   desc: "股票代码" }
+      pre_close:  { type: float, desc: "昨日收盘价", default: false }
+      up_limit:   { type: float, desc: "涨停价" }
+      down_limit: { type: float, desc: "跌停价" }
+
+  stk_premarket:
+    desc: 每日开盘前股本情况(总股本/流通股本/涨跌停价), 盘前更新
+    permission: 基础积分
+    max_rows: 8000
+    inputs:
+      ts_code:    { type: str, required: false, desc: "股票代码" }
+      trade_date: { type: str, required: false, desc: "交易日期 YYYYMMDD" }
+      start_date: { type: str, required: false, desc: "开始日期" }
+      end_date:   { type: str, required: false, desc: "结束日期" }
+    outputs:
+      trade_date:  { type: str,   desc: "交易日期" }
+      ts_code:     { type: str,   desc: "股票代码" }
+      total_share: { type: float, desc: "总股本(万股)" }
+      float_share: { type: float, desc: "流通股本(万股)" }
+      pre_close:   { type: float, desc: "昨日收盘价" }
+      up_limit:    { type: float, desc: "今日涨停价" }
+      down_limit:  { type: float, desc: "今日跌停价" }
+
+  # ============================================================
+  # 基础信息
+  # ============================================================
+
+  stock_basic:
+    desc: 股票基础信息(代码/名称/上市日期/退市日期等)
+    permission: 2000
+    inputs:
+      ts_code:     { type: str, required: false, desc: "TS股票代码" }
+      name:        { type: str, required: false, desc: "名称" }
+      market:      { type: str, required: false, desc: "市场: 主板/创业板/科创板/CDR/北交所" }
+      list_status: { type: str, required: false, desc: "L上市 D退市 P暂停上市 G过会未交易, 默认L" }
+      exchange:    { type: str, required: false, desc: "SSE上交所 SZSE深交所 BSE北交所" }
+      is_hs:       { type: str, required: false, desc: "沪深港通标的: N否 H沪股通 S深股通" }
+    outputs:
+      ts_code:      { type: str, desc: "TS代码" }
+      symbol:       { type: str, desc: "股票代码" }
+      name:         { type: str, desc: "股票名称" }
+      area:         { type: str, desc: "地域" }
+      industry:     { type: str, desc: "所属行业" }
+      fullname:     { type: str, desc: "股票全称", default: false }
+      enname:       { type: str, desc: "英文全称", default: false }
+      cnspell:      { type: str, desc: "拼音缩写" }
+      market:       { type: str, desc: "市场类型" }
+      exchange:     { type: str, desc: "交易所代码", default: false }
+      curr_type:    { type: str, desc: "交易货币", default: false }
+      list_status:  { type: str, desc: "上市状态", default: false }
+      list_date:    { type: str, desc: "上市日期" }
+      delist_date:  { type: str, desc: "退市日期", default: false }
+      is_hs:        { type: str, desc: "是否沪深港通标的", default: false }
+      act_name:     { type: str, desc: "实控人名称" }
+      act_ent_type: { type: str, desc: "实控人企业性质" }
+    notes:
+      - "industry字段不支持作为查询过滤条件, 需全量查询后本地过滤"
+
+  stock_company:
+    desc: 上市公司基础信息
+    permission: 120
+    max_rows: 4500
+    inputs:
+      ts_code:  { type: str, required: false, desc: "股票代码" }
+      exchange: { type: str, required: false, desc: "交易所代码 SSE/SZSE/BSE" }
+    outputs:
+      ts_code:        { type: str,   desc: "股票代码" }
+      com_name:       { type: str,   desc: "公司全称" }
+      com_id:         { type: str,   desc: "统一社会信用代码" }
+      exchange:       { type: str,   desc: "交易所代码" }
+      chairman:       { type: str,   desc: "法人代表" }
+      manager:        { type: str,   desc: "总经理" }
+      secretary:      { type: str,   desc: "董秘" }
+      reg_capital:    { type: float, desc: "注册资本(万元)" }
+      setup_date:     { type: str,   desc: "注册日期" }
+      province:       { type: str,   desc: "所在省份" }
+      city:           { type: str,   desc: "所在城市" }
+      introduction:   { type: str,   desc: "公司介绍", default: false }
+      website:        { type: str,   desc: "公司主页" }
+      email:          { type: str,   desc: "电子邮件" }
+      employees:      { type: int,   desc: "员工人数" }
+      main_business:  { type: str,   desc: "主要业务及产品", default: false }
+      business_scope: { type: str,   desc: "经营范围", default: false }
+
+  trade_cal:
+    desc: 各大交易所交易日历, 默认上交所
+    permission: 2000
+    inputs:
+      exchange:   { type: str, required: false, desc: "SSE/SZSE/CFFEX/SHFE/CZCE/DCE/INE" }
+      start_date: { type: str, required: false, desc: "开始日期 YYYYMMDD" }
+      end_date:   { type: str, required: false, desc: "结束日期" }
+      is_open:    { type: str, required: false, desc: "0休市 1交易" }
+    outputs:
+      exchange:      { type: str, desc: "交易所" }
+      cal_date:      { type: str, desc: "日历日期" }
+      is_open:       { type: str, desc: "是否交易 0休市 1交易" }
+      pretrade_date: { type: str, desc: "上一个交易日" }
+
+  stock_st:
+    desc: ST股票列表, 数据从20160101开始
+    permission: 3000
+    max_rows: 1000
+    update_time: "每天9:20"
+    inputs:
+      ts_code:    { type: str, required: false, desc: "股票代码" }
+      trade_date: { type: str, required: false, desc: "交易日期 YYYYMMDD" }
+      start_date: { type: str, required: false, desc: "开始时间" }
+      end_date:   { type: str, required: false, desc: "结束时间" }
+    outputs:
+      ts_code:    { type: str, desc: "股票代码" }
+      name:       { type: str, desc: "股票名称" }
+      trade_date: { type: str, desc: "交易日期" }
+      type:       { type: str, desc: "类型" }
+      type_name:  { type: str, desc: "类型名称" }
+
+  stock_hsgt:
+    desc: 沪深港通股票列表, 数据从20250812开始
+    permission: 3000
+    max_rows: 2000
+    update_time: "每天9:20"
+    inputs:
+      ts_code:    { type: str, required: false, desc: "股票代码" }
+      trade_date: { type: str, required: false, desc: "交易日期 YYYYMMDD" }
+      type:       { type: str, required: true,  desc: "HK_SZ(深股通港>深) SZ_HK(港股通深>港) HK_SH(沪股通港>沪) SH_HK(港股通沪>港)" }
+      start_date: { type: str, required: false, desc: "开始时间" }
+      end_date:   { type: str, required: false, desc: "结束时间" }
+    outputs:
+      ts_code:    { type: str, desc: "股票代码" }
+      trade_date: { type: str, desc: "交易日期" }
+      type:       { type: str, desc: "类型" }
+      name:       { type: str, desc: "股票名称" }
+      type_name:  { type: str, desc: "类型名称" }
+
+  stk_managers:
+    desc: 上市公司管理层
+    permission: 2000
+    inputs:
+      ts_code:    { type: str, required: false, desc: "股票代码, 支持单个或多个" }
+      ann_date:   { type: str, required: false, desc: "公告日期 YYYYMMDD" }
+      start_date: { type: str, required: false, desc: "公告开始日期" }
+      end_date:   { type: str, required: false, desc: "公告结束日期" }
+    outputs:
+      ts_code:    { type: str, desc: "TS股票代码" }
+      ann_date:   { type: str, desc: "公告日期" }
+      name:       { type: str, desc: "姓名" }
+      gender:     { type: str, desc: "性别" }
+      lev:        { type: str, desc: "岗位类别" }
+      title:      { type: str, desc: "岗位" }
+      edu:        { type: str, desc: "学历" }
+      national:   { type: str, desc: "国籍" }
+      birthday:   { type: str, desc: "出生年月" }
+      begin_date: { type: str, desc: "上任日期" }
+      end_date:   { type: str, desc: "离任日期" }
+      resume:     { type: str, desc: "个人简历", default: false }
+
+  stk_rewards:
+    desc: 管理层薪酬和持股
+    permission: 2000
+    inputs:
+      ts_code:  { type: str, required: true,  desc: "TS股票代码, 支持单个或多个" }
+      end_date: { type: str, required: false, desc: "报告期" }
+    outputs:
+      ts_code:  { type: str,   desc: "TS股票代码" }
+      ann_date: { type: str,   desc: "公告日期" }
+      end_date: { type: str,   desc: "截止日期" }
+      name:     { type: str,   desc: "姓名" }
+      title:    { type: str,   desc: "职务" }
+      reward:   { type: float, desc: "报酬" }
+      hold_vol: { type: float, desc: "持股数" }
+
+  # ============================================================
+  # 每日指标
+  # ============================================================
+
+  daily_basic:
+    desc: 全部股票每日重要基本面指标, 交易日15~17点更新
+    permission: 2000
+    permission_unlimited: 5000
+    max_rows: 6000
+    inputs:
+      ts_code:    { type: str, required: false, desc: "股票代码(与trade_date二选一)" }
+      trade_date: { type: str, required: false, desc: "交易日期" }
+      start_date: { type: str, required: false, desc: "开始日期" }
+      end_date:   { type: str, required: false, desc: "结束日期" }
+    outputs:
+      ts_code:         { type: str,   desc: "TS股票代码" }
+      trade_date:      { type: str,   desc: "交易日期" }
+      close:           { type: float, desc: "当日收盘价" }
+      turnover_rate:   { type: float, desc: "换手率(%)" }
+      turnover_rate_f: { type: float, desc: "换手率(自由流通股)" }
+      volume_ratio:    { type: float, desc: "量比" }
+      pe:              { type: float, desc: "市盈率(总市值/净利润, 亏损为空)" }
+      pe_ttm:          { type: float, desc: "市盈率(TTM)" }
+      pb:              { type: float, desc: "市净率" }
+      ps:              { type: float, desc: "市销率" }
+      ps_ttm:          { type: float, desc: "市销率(TTM)" }
+      dv_ratio:        { type: float, desc: "股息率(%)" }
+      dv_ttm:          { type: float, desc: "股息率TTM(%)" }
+      total_share:     { type: float, desc: "总股本(万股)" }
+      float_share:     { type: float, desc: "流通股本(万股)" }
+      free_share:      { type: float, desc: "自由流通股本(万)" }
+      total_mv:        { type: float, desc: "总市值(万元)" }
+      circ_mv:         { type: float, desc: "流通市值(万元)" }
+    notes:
+      - "ts_code 与 trade_date 二选一: 按trade_date查全市场更高效, 再按成分股列表过滤"
+      - "circ_mv 单位是万元, 换算亿元需 /10000"
+
+  # ============================================================
+  # 备用行情(高价值接口)
+  # ============================================================
+
+  bak_daily:
+    desc: 备用行情, 含特定指标(interval_3近3月涨幅等), 数据从2017年中开始
+    permission: 5000
+    max_rows: 7000
+    inputs:
+      ts_code:    { type: str, required: false, desc: "股票代码" }
+      trade_date: { type: str, required: false, desc: "交易日期" }
+      start_date: { type: str, required: false, desc: "开始日期" }
+      end_date:   { type: str, required: false, desc: "结束日期" }
+    outputs:
+      ts_code:      { type: str,   desc: "股票代码" }
+      trade_date:   { type: str,   desc: "交易日期" }
+      name:         { type: str,   desc: "股票名称" }
+      pct_change:   { type: float, desc: "涨跌幅" }
+      close:        { type: float, desc: "收盘价" }
+      open:         { type: float, desc: "开盘价" }
+      high:         { type: float, desc: "最高价" }
+      low:          { type: float, desc: "最低价" }
+      pre_close:    { type: float, desc: "昨收价" }
+      vol_ratio:    { type: float, desc: "量比" }
+      turn_over:    { type: float, desc: "换手率" }
+      swing:        { type: float, desc: "振幅" }
+      selling:      { type: float, desc: "内盘(手)" }
+      buying:       { type: float, desc: "外盘(手)" }
+      total_share:  { type: float, desc: "总股本(亿)" }
+      float_share:  { type: float, desc: "流通股本(亿)" }
+      pe:           { type: float, desc: "市盈率" }
+      float_mv:     { type: float, desc: "流通市值" }
+      total_mv:     { type: float, desc: "总市值" }
+      avg_price:    { type: float, desc: "均价" }
+      strength:     { type: float, desc: "强弱度(%)" }
+      activity:     { type: float, desc: "活跃度(%)" }
+      avg_turnover: { type: float, desc: "笔换手" }
+      attack:       { type: float, desc: "攻击波(%)" }
+      interval_3:   { type: float, desc: "近3月涨幅(%)" }
+      interval_6:   { type: float, desc: "近6月涨幅(%)" }
+    notes:
+      - "interval_3 和 interval_6 直接返回近3/6月涨幅, 无需手动计算首尾差分"
+      - "一次调用可获取全市场当日数据(按trade_date), 再按成分股过滤, 效率极高"
+      - "注意列名是 pct_change 不是 pct_chg"
+
+  bak_basic:
+    desc: 备用基础列表, 数据从2016年开始
+    permission: 5000
+    max_rows: 7000
+    inputs:
+      trade_date: { type: str, required: false, desc: "交易日期" }
+      ts_code:    { type: str, required: false, desc: "股票代码" }
+    outputs:
+      trade_date:         { type: str,   desc: "交易日期" }
+      ts_code:            { type: str,   desc: "TS股票代码" }
+      name:               { type: str,   desc: "股票名称" }
+      industry:           { type: str,   desc: "行业" }
+      area:               { type: str,   desc: "地域" }
+      pe:                 { type: float, desc: "市盈率(动)" }
+      float_share:        { type: float, desc: "流通股本(亿)" }
+      total_share:        { type: float, desc: "总股本(亿)" }
+      total_assets:       { type: float, desc: "总资产(亿)" }
+      liquid_assets:      { type: float, desc: "流动资产(亿)" }
+      fixed_assets:       { type: float, desc: "固定资产(亿)" }
+      reserved:           { type: float, desc: "公积金" }
+      reserved_pershare:  { type: float, desc: "每股公积金" }
+      eps:                { type: float, desc: "每股收益" }
+      bvps:               { type: float, desc: "每股净资产" }
+      pb:                 { type: float, desc: "市净率" }
+      list_date:          { type: str,   desc: "上市日期" }
+      undp:               { type: float, desc: "未分配利润" }
+      per_undp:           { type: float, desc: "每股未分配利润" }
+      rev_yoy:            { type: float, desc: "收入同比(%)" }
+      profit_yoy:         { type: float, desc: "利润同比(%)" }
+      gpr:                { type: float, desc: "毛利率(%)" }
+      npr:                { type: float, desc: "净利润率(%)" }
+      holder_num:         { type: int,   desc: "股东人数" }
+
+  # ============================================================
+  # 技术因子
+  # ============================================================
+
+  stk_factor_pro:
+    desc: 股票每日技术面因子(专业版), 覆盖全历史, 含_bfq/_qfq/_hfq三版
+    permission: 5000
+    rate_limit: "5000积分30/min, 8000积分500/min"
+    max_rows: 10000
+    inputs:
+      ts_code:    { type: str, required: false, desc: "股票代码" }
+      trade_date: { type: str, required: false, desc: "交易日期 yyyymmdd" }
+      start_date: { type: str, required: false, desc: "开始日期" }
+      end_date:   { type: str, required: false, desc: "结束日期" }
+    outputs:
+      基础行情:
+        - "open/high/low/close (含 _bfq/_qfq/_hfq)"
+        - "pre_close, change, pct_chg"
+        - "vol, amount, turnover_rate, turnover_rate_f, volume_ratio"
+        - "pe, pe_ttm, pb, ps, ps_ttm"
+        - "dv_ratio, dv_ttm"
+        - "total_share, float_share, free_share, total_mv, circ_mv"
+        - "adj_factor"
+      技术指标(均含 _bfq/_qfq/_hfq):
+        趋势类:
+          ma:     "MA 5/10/20/30/60/90/250"
+          ema:    "EMA 5/10/20/30/60/90/250"
+          expma:  "EMA指数平均 N1=12, N2=50"
+          boll:   "布林带 boll_lower/mid/upper N=20, P=2"
+          bbi:    "BBI多空 M1=3,M2=6,M3=12,M4=20"
+          trix:   "三重指数平滑 trix/trma M1=12, M2=20"
+        动量类:
+          macd:   "MACD macd/macd_dea/macd_dif SHORT=12,LONG=26,M=9"
+          kdj:    "KDJ kdj/kdj_d/kdj_k N=9,M1=3,M2=3"
+          rsi:    "RSI rsi_6/rsi_12/rsi_24"
+          cci:    "CCI顺势 N=14"
+          mtm:    "MTM动量 mtm/mtmma N=12,M=6"
+          roc:    "ROC变动率 roc/maroc N=12,M=6"
+          wr:     "W&R威廉 wr/wr1 N=10,N1=6"
+          dmi:    "DMI动向 dmi_adx/adxr/mdi/pdi M1=14,M2=6"
+          psy:    "PSY心理线 psy/psyma N=12,M=6"
+        波动类:
+          atr:    "ATR真实波动 N=20"
+          bias:   "BIAS乖离率 bias1/2/3 L1=6,L2=12,L3=24"
+          ktn:    "肯特纳通道 ktn_down/mid/upper N=20,M=10"
+          taq:    "唐安奇通道(海龟) taq_down/mid/up"
+        量能类:
+          obv:    "OBV能量潮"
+          vr:     "VR容量比率 M1=26"
+          mfi:    "MFI成交量RSI N=14"
+          emv:    "EMV简易波动 emv/maemv N=14,M=9"
+        其他:
+          asi:    "ASI振动升降 asi/asit M1=26,M2=10"
+          brar:   "BRAR情绪 brar_ar/brar_br M1=26"
+          cr:     "CR价格动量 N=20"
+          dfma:   "DFMA平行线差 dfma_dif/dfma_difma N1=10,N2=50,M=10"
+          dpo:    "DPO区间震荡 dpo/madpo M1=20,M2=10,M3=6"
+          mass:   "MASS梅斯线 mass/ma_mass N1=9,N2=25,M=6"
+          xsii:   "薛斯通道II xsii_td1/2/3/4 N=102,M=7"
+          updays:   "连涨天数"
+          downdays: "连跌天数"
+          topdays:  "近期最高价周期数"
+          lowdays:  "近期最低价周期数"
+    notes:
+      - "同时包含行情+daily_basic全部字段+技术指标, 可一个接口替代 daily + daily_basic 两次调用"
+      - "积分5000起步, 8000以上提速到500/min"
+
+  stk_nineturn:
+    desc: 神奇九转指标(TD序列趋势反转), 数据从20230101开始
+    permission: 6000
+    max_rows: 10000
+    update_time: "每天21点"
+    inputs:
+      ts_code:    { type: str, required: false, desc: "股票代码" }
+      trade_date: { type: str, required: false, desc: "交易日期(格式 YYYY-MM-DD HH:MM:SS)" }
+      freq:       { type: str, required: false, desc: "频率(日daily)" }
+      start_date: { type: str, required: false, desc: "开始时间" }
+      end_date:   { type: str, required: false, desc: "结束时间" }
+    outputs:
+      ts_code:        { type: str,      desc: "股票代码" }
+      trade_date:     { type: datetime, desc: "交易日期" }
+      freq:           { type: str,      desc: "频率" }
+      open:           { type: float,    desc: "开盘价" }
+      high:           { type: float,    desc: "最高价" }
+      low:            { type: float,    desc: "最低价" }
+      close:          { type: float,    desc: "收盘价" }
+      vol:            { type: float,    desc: "成交量" }
+      amount:         { type: float,    desc: "成交额" }
+      up_count:       { type: float,    desc: "上九转计数" }
+      down_count:     { type: float,    desc: "下九转计数" }
+      nine_up_turn:   { type: str,      desc: "是否上九转(+9表示上九转)" }
+      nine_down_turn: { type: str,      desc: "是否下九转(-9表示下九转)" }
+
+  # ============================================================
+  # 筹码分布
+  # ============================================================
+
+  cyq_perf:
+    desc: A股每日筹码平均成本和胜率, 每天18~19点更新, 数据从2018年开始
+    permission: 5000
+    rate_limit: "5000积分20000/day, 10000积分200000/day, 15000积分不限"
+    inputs:
+      ts_code:    { type: str, required: true,  desc: "股票代码" }
+      trade_date: { type: str, required: false, desc: "交易日期 YYYYMMDD" }
+      start_date: { type: str, required: false, desc: "开始日期" }
+      end_date:   { type: str, required: false, desc: "结束日期" }
+    outputs:
+      ts_code:    { type: str,   desc: "股票代码" }
+      trade_date: { type: str,   desc: "交易日期" }
+      his_low:    { type: float, desc: "历史最低价" }
+      his_high:   { type: float, desc: "历史最高价" }
+      cost_5pct:  { type: float, desc: "5%分位成本" }
+      cost_15pct: { type: float, desc: "15%分位成本" }
+      cost_50pct: { type: float, desc: "50%分位成本(中位数)" }
+      cost_85pct: { type: float, desc: "85%分位成本" }
+      cost_95pct: { type: float, desc: "95%分位成本" }
+      weight_avg: { type: float, desc: "加权平均成本" }
+      winner_rate: { type: float, desc: "胜率(获利比例)" }
+    notes:
+      - "winner_rate 可用于判断主力成本区和套牢盘压力"
+      - "与当前价比较: winner_rate高说明大部分筹码获利, 可能面临获利回吐压力"
+
+  cyq_chips:
+    desc: A股每日筹码分布(各价位占比), 数据从2018年开始
+    permission: 5000
+    rate_limit: "同 cyq_perf"
+    max_rows: 2000
+    inputs:
+      ts_code:    { type: str, required: true,  desc: "股票代码" }
+      trade_date: { type: str, required: false, desc: "交易日期 YYYYMMDD" }
+      start_date: { type: str, required: false, desc: "开始日期" }
+      end_date:   { type: str, required: false, desc: "结束日期" }
+    outputs:
+      ts_code:    { type: str,   desc: "股票代码" }
+      trade_date: { type: str,   desc: "交易日期" }
+      price:      { type: float, desc: "成本价格" }
+      percent:    { type: float, desc: "价格占比(%)" }
+
+  # ============================================================
+  # 财务数据
+  # ============================================================
+
+  income:
+    desc: 利润表
+    permission: 2000
+    vip_interface: income_vip
+    vip_desc: "全部股票某季度, 需5000积分"
+    inputs:
+      ts_code:    { type: str, required: true,  desc: "股票代码" }
+      ann_date:   { type: str, required: false, desc: "公告日期" }
+      f_ann_date: { type: str, required: false, desc: "实际公告日期" }
+      start_date: { type: str, required: false, desc: "公告日开始日期" }
+      end_date:   { type: str, required: false, desc: "公告日结束日期" }
+      period:     { type: str, required: false, desc: "报告期(如20171231年报, 20170630半年报)" }
+      report_type: { type: str, required: false, desc: "报告类型" }
+      comp_type:  { type: str, required: false, desc: "1一般工商业 2银行 3保险 4证券" }
+    outputs:
+      basic_eps:          { type: float, desc: "基本每股收益" }
+      diluted_eps:        { type: float, desc: "稀释每股收益" }
+      total_revenue:      { type: float, desc: "营业总收入" }
+      revenue:            { type: float, desc: "营业收入" }
+      total_cogs:         { type: float, desc: "营业总成本" }
+      oper_cost:          { type: float, desc: "营业成本" }
+      sell_exp:           { type: float, desc: "销售费用" }
+      admin_exp:          { type: float, desc: "管理费用" }
+      fin_exp:            { type: float, desc: "财务费用" }
+      assets_impair_loss: { type: float, desc: "资产减值损失" }
+      operate_profit:     { type: float, desc: "营业利润" }
+      total_profit:       { type: float, desc: "利润总额" }
+      income_tax:         { type: float, desc: "所得税费用" }
+      n_income:           { type: float, desc: "净利润(含少数股东损益)" }
+      n_income_attr_p:    { type: float, desc: "净利润(不含少数股东损益)" }
+      ebit:               { type: float, desc: "息税前利润" }
+      ebitda:             { type: float, desc: "息税折旧摊销前利润" }
+      rd_exp:             { type: float, desc: "研发费用" }
+      credit_impa_loss:   { type: float, desc: "信用减值损失" }
+      update_flag:        { type: str,   desc: "更新标识" }
+
+  balancesheet:
+    desc: 资产负债表
+    permission: 2000
+    vip_interface: balancesheet_vip
+    inputs: "同 income"
+    outputs:
+      资产端:
+        money_cap:        "货币资金"
+        trad_asset:       "交易性金融资产"
+        accounts_receiv:  "应收账款"
+        inventories:      "存货"
+        total_cur_assets: "流动资产合计"
+        fix_assets:       "固定资产"
+        intan_assets:     "无形资产"
+        goodwill:         "商誉"
+        total_nca:        "非流动资产合计"
+        total_assets:     "资产总计"
+      负债端:
+        st_borr:          "短期借款"
+        acct_payable:     "应付账款"
+        total_cur_liab:   "流动负债合计"
+        bond_payable:     "应付债券"
+        total_ncl:        "非流动负债合计"
+        total_liab:       "负债合计"
+      股东权益:
+        total_hldr_eqy_exc_min_int: "股东权益合计(不含少数股东)"
+        total_hldr_eqy_inc_min_int: "股东权益合计(含少数股东)"
+        total_liab_hldr_eqy:        "负债及股东权益总计"
+
+  cashflow:
+    desc: 现金流量表
+    permission: 2000
+    vip_interface: cashflow_vip
+    inputs: "同 income, 增加 is_calc(是否计算报表)"
+    outputs:
+      经营活动:
+        c_fr_sale_sg:     "销售商品收到现金"
+        c_paid_goods_s:   "购买商品支付现金"
+        n_cashflow_act:   "经营活动现金流量净额"
+      投资活动:
+        c_pay_acq_const_fiolta: "购建固定资产支付现金"
+        n_cashflow_inv_act:     "投资活动现金流量净额"
+      筹资活动:
+        c_recp_borrow:           "取得借款收到现金"
+        c_pay_dist_dpcp_int_exp: "分配股利/利润/偿付利息"
+        n_cash_flows_fnc_act:    "筹资活动现金流量净额"
+      其他:
+        n_incr_cash_cash_equ: "现金及现金等价物净增加额"
+        free_cashflow:        "企业自由现金流量"
+
+  forecast:
+    desc: 业绩预告
+    permission: 2000
+    vip_interface: forecast_vip
+    inputs:
+      ts_code:    { type: str, required: false, desc: "股票代码(与ann_date二选一)" }
+      ann_date:   { type: str, required: false, desc: "公告日期" }
+      start_date: { type: str, required: false, desc: "公告开始日期" }
+      end_date:   { type: str, required: false, desc: "公告结束日期" }
+      period:     { type: str, required: false, desc: "报告期" }
+      type:       { type: str, required: false, desc: "预增/预减/扭亏/首亏/续亏/续盈/略增/略减" }
+    outputs:
+      ts_code:         { type: str,   desc: "TS股票代码" }
+      ann_date:        { type: str,   desc: "公告日期" }
+      end_date:        { type: str,   desc: "报告期" }
+      type:            { type: str,   desc: "业绩预告类型" }
+      p_change_min:    { type: float, desc: "预告净利润变动幅度下限(%)" }
+      p_change_max:    { type: float, desc: "预告净利润变动幅度上限(%)" }
+      net_profit_min:  { type: float, desc: "预告净利润下限(万元)" }
+      net_profit_max:  { type: float, desc: "预告净利润上限(万元)" }
+      last_parent_net: { type: float, desc: "上年同期归属母公司净利润" }
+      first_ann_date:  { type: str,   desc: "首次公告日" }
+      summary:         { type: str,   desc: "业绩预告摘要" }
+      change_reason:   { type: str,   desc: "业绩变动原因" }
+
+  fina_mainbz:
+    desc: 主营业务构成
+    permission: 2000
+    vip_interface: fina_mainbz_vip
+    max_rows: 100
+    inputs:
+      ts_code:    { type: str, required: true,  desc: "股票代码" }
+      period:     { type: str, required: false, desc: "报告期" }
+      type:       { type: str, required: false, desc: "P按产品 D按地区 I按行业" }
+      start_date: { type: str, required: false, desc: "报告期开始日期" }
+      end_date:   { type: str, required: false, desc: "报告期结束日期" }
+    outputs:
+      ts_code:     { type: str,   desc: "TS代码" }
+      end_date:    { type: str,   desc: "报告期" }
+      bz_item:     { type: str,   desc: "主营业务来源" }
+      bz_sales:    { type: float, desc: "主营业务收入(元)" }
+      bz_profit:   { type: float, desc: "主营业务利润(元)" }
+      bz_cost:     { type: float, desc: "主营业务成本(元)" }
+      curr_type:   { type: str,   desc: "货币代码" }
+      update_flag: { type: str,   desc: "是否更新" }
+
+  # ============================================================
+  # ST相关
+  # ============================================================
+
+  st:
+    desc: ST风险警示板股票列表
+    permission: 6000
+    max_rows: 1000
+    inputs:
+      ts_code:  { type: str, required: false, desc: "股票代码" }
+      pub_date: { type: str, required: false, desc: "发布日期" }
+      imp_date: { type: str, required: false, desc: "实施日期" }
+    outputs:
+      ts_code:    { type: str, desc: "股票代码" }
+      name:       { type: str, desc: "股票名称" }
+      pub_date:   { type: str, desc: "发布日期" }
+      imp_date:   { type: str, desc: "实施日期" }
+      st_tpye:    { type: str, desc: "类型" }
+      st_reason:  { type: str, desc: "ST变更原因" }
+      st_explain: { type: str, desc: "ST变更详细原因" }
+
+# ============================================================
+# 快速查询表: 按使用场景推荐接口
+# ============================================================
+
+recipes:
+  个股近3月涨幅排名:
+    recommended: bak_daily
+    field: interval_3
+    fallback: "daily 手动计算首尾差分"
+    note: "bak_daily 一次调用全市场, 直接包含 interval_3/interval_6"
+
+  个股估值指标:
+    recommended: daily_basic
+    query_by: trade_date
+    fields: [pe_ttm, pb, ps_ttm, circ_mv, turnover_rate_f]
+    note: "按 trade_date 查全市场, 再按成分股列表过滤, 比拼 ts_code 字符串更稳定"
+
+  技术指标全家桶:
+    recommended: stk_factor_pro
+    note: "包含行情+daily_basic全部字段+所有技术指标, 可替代 daily + daily_basic 两次调用"
+
+  筹码成本与胜率:
+    recommended: cyq_perf
+    fields: [weight_avg, winner_rate, cost_50pct]
+    note: "winner_rate 判断获利盘比例, 高胜率意味可能面临获利回吐"
+
+  业绩预告:
+    recommended: forecast
+    query_by: ann_date
+    note: "按公告日期批量查, 筛选半导体成分股"
+
+  前复权日线:
+    recommended: pro_bar
+    params: { adj: qfq, asset: E, freq: D }
+    note: "pro_bar 不支持多只股票, 需逐只循环"
+
+# ============================================================
+# 列名差异警告(容易混淆)
+# ============================================================
+
+column_name_warnings:
+  pct_chg_vs_pct_change:
+    daily:     pct_chg
+    bak_daily: pct_change
+    sw_daily:  pct_change
+    top_list:  pct_change
+    note: "同一个涨跌幅字段, 不同接口列名不同!"
+
+  market_value_units:
+    daily_basic:
+      circ_mv: "万元"
+      total_mv: "万元"
+    bak_daily:
+      float_mv: "元(需确认)"
+      total_mv: "元(需确认)"
+    bak_basic:
+      float_share: "亿"
+      total_share: "亿"
+    note: "不同接口的市值/股本单位不统一, 务必确认后再计算"
+
+# ============================================================
+# 积分权限分级
+# ============================================================
+
+permission_tiers:
+  基础:
+    permission: 基础积分
+    interfaces: [daily, pro_bar, stk_premarket]
+
+  标准:
+    permission: 2000
+    interfaces: [stock_basic, trade_cal, daily_basic, weekly, monthly, adj_factor,
+                 stk_limit, income, balancesheet, cashflow, forecast, fina_mainbz,
+                 stk_managers, stk_rewards, stk_weekly_monthly, stk_week_month_adj]
+
+  专业:
+    permission: 3000
+    interfaces: [stock_st, stock_hsgt]
+
+  高级:
+    permission: 5000
+    interfaces: [bak_daily, bak_basic, stk_factor_pro, cyq_perf, cyq_chips]
+    note: "bak_daily 的 interval_3 和 stk_factor_pro 的技术指标是最有价值的高级接口"
+
+  旗舰:
+    permission: 6000
+    interfaces: [st, stk_nineturn]
