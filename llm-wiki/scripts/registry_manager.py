@@ -3,10 +3,9 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import sys
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Iterable
 
@@ -21,6 +20,9 @@ RUNTIME_DIR = Path(os.environ.get("HERMES_LLM_WIKI_RUNTIME_DIR", SKILL_DIR / "ru
 REGISTRY_MD = RUNTIME_DIR / "wiki-structure.log.md"
 REGISTRY_JSON = RUNTIME_DIR / "subwiki-registry.json"
 EVENT_LOG = RUNTIME_DIR / "wiki-events.log"
+SCHEMA_TEMPLATE = SKILL_DIR / "references/schema-template.md"
+REGISTRY_SCHEMA_VERSION = 2
+STALE_REFRESH_SECONDS = int(os.environ.get("HERMES_LLM_WIKI_STALE_REFRESH_SECONDS", "600"))
 
 SEARCH_ROOTS = [
     HOME,
@@ -34,21 +36,43 @@ SEARCH_ROOTS = [
 @dataclass
 class Candidate:
     path: Path
+    canonical_path: Path
+    aliases: set[str]
     markers: list[str]
     score: int
     source_hints: set[str]
     structure: list[str]
 
+    def selected(self, selected: Path | None) -> bool:
+        return selected is not None and self.canonical_path == selected
+
+    def under_root(self, remembered_root: Path | None) -> bool:
+        return remembered_root is not None and is_under(self.canonical_path, remembered_root)
+
+    def ambiguity_flags(self, remembered_root: Path | None) -> list[str]:
+        flags: list[str] = []
+        if self.under_root(remembered_root):
+            flags.append("under-root")
+        if "SCHEMA.md" not in self.markers and "CLAUDE.md" not in self.markers:
+            flags.append("missing-schema")
+        if "raw/" not in self.markers or "wiki/" not in self.markers:
+            flags.append("non-canonical-layout")
+        if self.path.name == "vault":
+            flags.append("nested-vault")
+        return flags
+
     def as_json(self, remembered_root: Path | None, selected: Path | None) -> dict:
-        path_str = str(self.path)
         return {
-            "path": path_str,
+            "path": str(self.path),
+            "canonical_path": str(self.canonical_path),
+            "aliases": sorted(self.aliases),
             "markers": self.markers,
             "score": self.score,
-            "selected": selected is not None and self.path == selected,
-            "under_root": remembered_root is not None and is_under(self.path, remembered_root),
+            "selected": self.selected(selected),
+            "under_root": self.under_root(remembered_root),
             "last_seen": now_iso(),
             "source_hints": sorted(self.source_hints),
+            "ambiguity_flags": self.ambiguity_flags(remembered_root),
             "structure": self.structure,
         }
 
@@ -170,10 +194,7 @@ def shallow_structure(path: Path) -> list[str]:
             continue
         if rel_s.startswith(".obsidian/workspace") or rel_s == ".obsidian/cache":
             continue
-        if candidate.is_dir():
-            items.append(rel_s)
-        else:
-            items.append(rel_s)
+        items.append(rel_s)
     return items
 
 
@@ -201,24 +222,29 @@ def obsidian_config_candidates() -> list[Path]:
 
 
 def add_candidate(store: dict[str, Candidate], path: Path, source_hint: str) -> None:
-    path = canonicalize(path)
-    if not path.is_dir():
+    raw_path = Path(path).expanduser()
+    if not raw_path.is_dir():
         return
-    markers = detect_markers(path)
-    score = score_candidate(path, markers)
+    canonical_path = canonicalize(raw_path)
+    markers = detect_markers(canonical_path)
+    score = score_candidate(canonical_path, markers)
     if score < 30:
         return
-    key = str(path)
+    key = str(canonical_path)
+    alias = str(raw_path)
     if key in store:
         store[key].source_hints.add(source_hint)
         store[key].score = max(store[key].score, score)
+        store[key].aliases.add(alias)
         return
     store[key] = Candidate(
-        path=path,
+        path=canonical_path,
+        canonical_path=canonical_path,
+        aliases={alias, str(canonical_path)},
         markers=markers,
         score=score,
         source_hints={source_hint},
-        structure=shallow_structure(path),
+        structure=shallow_structure(canonical_path),
     )
 
 
@@ -275,41 +301,112 @@ def collect_candidates() -> tuple[list[Candidate], Path | None, Path | None]:
     candidates = sorted(
         store.values(),
         key=lambda c: (
-            0 if selected and c.path == selected else 1,
-            0 if root and is_under(c.path, root) else 1,
+            0 if selected and c.canonical_path == selected else 1,
+            0 if root and is_under(c.canonical_path, root) else 1,
             -c.score,
-            str(c.path),
+            str(c.canonical_path),
         ),
     )
     return candidates, root, selected
 
 
-def refresh_registry() -> list[Candidate]:
+def read_last_refresh() -> datetime | None:
+    if not LAST_REFRESH_FILE.exists():
+        return None
+    raw = LAST_REFRESH_FILE.read_text(encoding="utf-8").strip()
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+
+
+def stale_status() -> tuple[bool, str]:
+    last_refresh = read_last_refresh()
+    if last_refresh is None:
+        return True, "missing"
+    age = datetime.now() - last_refresh
+    if age > timedelta(seconds=STALE_REFRESH_SECONDS):
+        return True, f"stale:{int(age.total_seconds())}s"
+    return False, f"fresh:{int(age.total_seconds())}s"
+
+
+def recommend_candidate(candidates: list[Candidate], root: Path | None, selected: Path | None) -> tuple[Candidate | None, str]:
+    if not candidates:
+        return None, "no candidates available"
+    if selected:
+        for candidate in candidates:
+            if candidate.canonical_path == selected:
+                return candidate, "explicitly selected sub-wiki"
+
+    best = candidates[0]
+    if root and best.under_root(root):
+        if len(candidates) > 1:
+            second = candidates[1]
+            if second.under_root(root) and second.score == best.score:
+                return best, "tie under remembered root; ask the user if you need certainty"
+        return best, "highest-scoring candidate under remembered root"
+
+    return best, "highest-scoring discovered candidate"
+
+
+def ambiguity_summary(candidates: list[Candidate], root: Path | None) -> list[str]:
+    if len(candidates) < 2:
+        return []
+    top = candidates[0]
+    peers = [c for c in candidates[1:] if c.score == top.score and c.under_root(root) == top.under_root(root)]
+    if not peers:
+        return []
+    lines = [f"top candidate tie on score={top.score}"]
+    for peer in [top, *peers[:3]]:
+        flags = ", ".join(peer.ambiguity_flags(root)) or "none"
+        lines.append(f"{peer.canonical_path} | flags={flags}")
+    return lines
+
+
+def refresh_registry(force: bool = False) -> list[Candidate]:
     ensure_dirs()
+    stale, stale_label = stale_status()
     candidates, root, selected = collect_candidates()
     LAST_REFRESH_FILE.write_text(f"{now_iso()}\n", encoding="utf-8")
+    recommended, reason = recommend_candidate(candidates, root, selected)
+    ambiguity = ambiguity_summary(candidates, root)
 
     lines = [
         "# LLM Wiki Runtime Registry",
         "",
+        f"- schema_version: {REGISTRY_SCHEMA_VERSION}",
         f"- generated_at: {now_human()}",
+        f"- previous_refresh_status: {stale_label}",
         f"- remembered_root: {root if root else 'none'}",
         f"- selected_sub_wiki: {selected if selected else 'none'}",
         f"- candidate_count: {len(candidates)}",
-        "",
-        "## Known Sub-Wikis",
+        f"- recommended_candidate: {recommended.canonical_path if recommended else 'none'}",
+        f"- recommendation_reason: {reason}",
         "",
     ]
+    if ambiguity:
+        lines.append("## Ambiguity Notes")
+        lines.append("")
+        for item in ambiguity:
+            lines.append(f"- {item}")
+        lines.append("")
+    lines.append("## Known Sub-Wikis")
+    lines.append("")
+
     if not candidates:
         lines.append("_No sub-wikis discovered._")
     else:
         for candidate in candidates:
-            lines.append(f"### `{candidate.path}`")
+            lines.append(f"### `{candidate.canonical_path}`")
             lines.append(f"- score: {candidate.score}")
+            lines.append(f"- aliases: {', '.join(sorted(candidate.aliases))}")
             lines.append(f"- markers: {', '.join(candidate.markers) if candidate.markers else 'none'}")
-            lines.append(f"- selected: {'yes' if selected and candidate.path == selected else 'no'}")
-            lines.append(f"- under_remembered_root: {'yes' if root and is_under(candidate.path, root) else 'no'}")
+            lines.append(f"- selected: {'yes' if candidate.selected(selected) else 'no'}")
+            lines.append(f"- under_remembered_root: {'yes' if candidate.under_root(root) else 'no'}")
             lines.append(f"- source_hints: {', '.join(sorted(candidate.source_hints))}")
+            lines.append(f"- ambiguity_flags: {', '.join(candidate.ambiguity_flags(root)) or 'none'}")
             lines.append("- structure:")
             for item in candidate.structure:
                 lines.append(f"  - {item}")
@@ -317,21 +414,26 @@ def refresh_registry() -> list[Candidate]:
     REGISTRY_MD.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     payload = {
+        "schema_version": REGISTRY_SCHEMA_VERSION,
         "generated_at": now_iso(),
+        "previous_refresh_status": stale_label,
         "remembered_root": str(root) if root else None,
         "selected_sub_wiki": str(selected) if selected else None,
         "candidate_count": len(candidates),
+        "recommended_candidate": str(recommended.canonical_path) if recommended else None,
+        "recommendation_reason": reason,
+        "ambiguity_notes": ambiguity,
         "candidates": [c.as_json(root, selected) for c in candidates],
     }
     REGISTRY_JSON.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     append_event(
         "refresh-registry",
-        f"count={len(candidates)} root={root if root else 'none'} selected={selected if selected else 'none'}",
+        f"count={len(candidates)} root={root if root else 'none'} selected={selected if selected else 'none'} force={force}",
     )
     return candidates
 
 
-def verify_candidate_relationships(root: Path | None, selected: Path | None) -> list[str]:
+def verify_candidate_relationships(root: Path | None, selected: Path | None, candidates: list[Candidate]) -> list[str]:
     issues: list[str] = []
     if root and not root.is_dir():
         issues.append(f"remembered root does not exist: {root}")
@@ -339,6 +441,8 @@ def verify_candidate_relationships(root: Path | None, selected: Path | None) -> 
         issues.append(f"selected sub-wiki does not exist: {selected}")
     if root and selected and selected.is_dir() and not is_under(selected, root):
         issues.append(f"selected sub-wiki is not under remembered root: {selected}")
+    if selected and candidates and not any(candidate.canonical_path == selected for candidate in candidates):
+        issues.append("selected sub-wiki is not present in runtime registry")
     return issues
 
 
@@ -346,13 +450,18 @@ def show_current() -> int:
     candidates = refresh_registry()
     root = read_state(WIKI_ROOT_FILE)
     selected = read_state(SELECTED_VAULT_FILE)
+    recommended, reason = recommend_candidate(candidates, root, selected)
+    stale, stale_label = stale_status()
     print(f"remembered_root={root if root else 'none'}")
     print(f"selected_sub_wiki={selected if selected else 'none'}")
     print(f"candidate_count={len(candidates)}")
+    print(f"registry_status={'stale' if stale else 'fresh'} ({stale_label})")
+    print(f"recommended_candidate={recommended.canonical_path if recommended else 'none'}")
+    print(f"recommendation_reason={reason}")
     if candidates:
         print("top_candidates=")
         for candidate in candidates[:5]:
-            print(f"  - {candidate.path} (score={candidate.score})")
+            print(f"  - {candidate.canonical_path} (score={candidate.score})")
     return 0
 
 
@@ -360,7 +469,10 @@ def doctor() -> int:
     candidates = refresh_registry()
     root = read_state(WIKI_ROOT_FILE)
     selected = read_state(SELECTED_VAULT_FILE)
-    issues = verify_candidate_relationships(root, selected)
+    issues = verify_candidate_relationships(root, selected, candidates)
+    recommended, reason = recommend_candidate(candidates, root, selected)
+    ambiguity = ambiguity_summary(candidates, root)
+    stale, stale_label = stale_status()
 
     print("LLM Wiki doctor report")
     print(f"- remembered_root: {root if root else 'none'}")
@@ -368,23 +480,32 @@ def doctor() -> int:
     print(f"- candidate_count: {len(candidates)}")
     print(f"- registry_markdown: {REGISTRY_MD}")
     print(f"- registry_json: {REGISTRY_JSON}")
+    print(f"- refresh_status: {'stale' if stale else 'fresh'} ({stale_label})")
+    print(f"- recommended_candidate: {recommended.canonical_path if recommended else 'none'}")
+    print(f"- recommendation_reason: {reason}")
     if LAST_REFRESH_FILE.exists():
         print(f"- last_refresh_at: {LAST_REFRESH_FILE.read_text(encoding='utf-8').strip()}")
 
+    if candidates:
+        print("- top_candidates:")
+        for candidate in candidates[:5]:
+            flags = ", ".join(candidate.ambiguity_flags(root)) or "none"
+            print(f"  - {candidate.canonical_path} | score={candidate.score} | flags={flags}")
+    if ambiguity:
+        print("- ambiguity_notes:")
+        for item in ambiguity:
+            print(f"  - {item}")
+
     if issues:
         print("- status: drift-detected")
+        print("- recommended_fixes:")
         for issue in issues:
             print(f"  - {issue}")
+        print("  - run `bash scripts/init-vault.sh --repair` if the drift is filesystem/state based")
         return 1
 
-    if selected:
-        matching = any(candidate.path == selected for candidate in candidates)
-        if not matching:
-            print("- status: drift-detected")
-            print("  - selected sub-wiki is not present in runtime registry")
-            return 1
-
     print("- status: healthy")
+    append_event("doctor", f"healthy count={len(candidates)}")
     return 0
 
 
@@ -413,7 +534,7 @@ def repair_state() -> int:
         changes.append(f"updated root to selected sub-wiki parent {inferred_root}")
         root = inferred_root
 
-    refresh_registry()
+    refresh_registry(force=True)
     details = "; ".join(changes) if changes else "no changes required"
     append_event("repair-state", details)
     print(details)
@@ -427,7 +548,10 @@ def remember_root(path_str: str) -> int:
         return 1
     write_state(WIKI_ROOT_FILE, root)
     append_event("set-root", f"root={root}")
-    refresh_registry()
+    refresh_registry(force=True)
+    print("root_memory_expected=yes")
+    print("root_state_file_updated=yes")
+    print("registry_refreshed=yes")
     print(f"Remembered wiki root: {root}")
     return 0
 
@@ -442,7 +566,10 @@ def remember_subwiki(path_str: str) -> int:
         return 1
     write_state(SELECTED_VAULT_FILE, path)
     append_event("remember-subwiki", f"sub_wiki={path}")
-    refresh_registry()
+    refresh_registry(force=True)
+    print("subwiki_memory_expected=yes")
+    print("subwiki_state_file_updated=yes")
+    print("registry_refreshed=yes")
     print(f"Remembered preferred sub-wiki: {path}")
     return 0
 
@@ -451,7 +578,7 @@ def forget_paths() -> int:
     clear_state(WIKI_ROOT_FILE)
     clear_state(SELECTED_VAULT_FILE)
     append_event("forget", "cleared root and selected sub-wiki")
-    refresh_registry()
+    refresh_registry(force=True)
     print("Cleared remembered wiki root and selected sub-wiki")
     return 0
 
@@ -459,6 +586,18 @@ def forget_paths() -> int:
 def write_if_missing(path: Path, content: str) -> None:
     if not path.exists():
         path.write_text(content, encoding="utf-8")
+
+
+def render_default_schema(path: Path) -> str:
+    if SCHEMA_TEMPLATE.exists():
+        template = SCHEMA_TEMPLATE.read_text(encoding="utf-8")
+        return (
+            "# LLM Wiki Schema\n\n"
+            f"Initialized for sub-wiki `{path.name}`. Customize the template below for your domain.\n\n"
+            f"Source template: `{SCHEMA_TEMPLATE}`\n\n"
+            f"---\n\n{template.strip()}\n"
+        )
+    return "# LLM Wiki Schema\n\nThis sub-wiki follows the llm-wiki layout with raw/, wiki/, output/, index.md, and log.md.\n"
 
 
 def initialize_subwiki(path_str: str) -> int:
@@ -475,23 +614,17 @@ def initialize_subwiki(path_str: str) -> int:
         (path / rel).mkdir(parents=True, exist_ok=True)
 
     today = datetime.now().strftime("%Y-%m-%d")
-    write_if_missing(
-        path / "SCHEMA.md",
-        "# LLM Wiki Schema\n\nThis sub-wiki follows the llm-wiki layout with raw/, wiki/, output/, index.md, and log.md.\n",
-    )
+    write_if_missing(path / "SCHEMA.md", render_default_schema(path))
     write_if_missing(
         path / "index.md",
         "# Index\n\n## Sources\n\n## Concepts\n\n## Entities\n\n## Comparisons\n",
     )
-    write_if_missing(
-        path / "log.md",
-        f"## [{today}] init | Initialized sub-wiki at {path}\n",
-    )
+    write_if_missing(path / "log.md", f"## [{today}] init | Initialized sub-wiki at {path}\n")
 
     write_state(SELECTED_VAULT_FILE, path)
     write_state(WIKI_ROOT_FILE, path.parent)
     append_event("init-subwiki", f"sub_wiki={path} root={path.parent}")
-    refresh_registry()
+    refresh_registry(force=True)
 
     print(f"Directories created at: {path}")
     print(f"Remembered preferred sub-wiki: {path}")
@@ -500,14 +633,22 @@ def initialize_subwiki(path_str: str) -> int:
 
 
 def print_candidates() -> int:
-    candidates = refresh_registry()
+    candidates = refresh_registry(force=True)
+    root = read_state(WIKI_ROOT_FILE)
+    ambiguity = ambiguity_summary(candidates, root)
     print("Detecting sub-wikis...")
     print("---")
     if not candidates:
         print("NO_VAULTS_FOUND")
     else:
         for index, candidate in enumerate(candidates, start=1):
-            print(f"{index}. {candidate.path} (score={candidate.score})")
+            flags = ", ".join(candidate.ambiguity_flags(root)) or "none"
+            print(f"{index}. {candidate.canonical_path} (score={candidate.score}, flags={flags})")
+    if ambiguity:
+        print("---")
+        print("Ambiguity notes:")
+        for item in ambiguity:
+            print(f"- {item}")
     append_event("detect", f"count={len(candidates)}")
     return 0
 
@@ -547,7 +688,7 @@ def main(argv: list[str]) -> int:
             return 1
         return remember_subwiki(argv[1])
     if cmd == "--refresh-registry":
-        refresh_registry()
+        refresh_registry(force=True)
         print(f"Refreshed runtime registry: {REGISTRY_MD}")
         return 0
     if cmd == "--show-current":

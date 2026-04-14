@@ -20,6 +20,14 @@ Karpathy's LLM Wiki pattern — a persistent, compounding knowledge base built o
 
 LLM 对知识库进行增量维护：读取原始文档 → 生成摘要卡片 → 提炼概念/实体页 → 更新索引。与 RAG 不同，这是持久化的知识积累，而非每次查询的临时检索。
 
+### Root vs Sub-Wiki
+
+`llm-wiki` 现在区分两个层级：
+- **Obsidian root**：例如 `~/obsidian/` 或 `~/.hermes/obsidian/`，用于存放多个 sub-wiki
+- **Sub-wiki**：真正工作的 wiki 目录，例如 `~/obsidian/company-research/`
+
+Skill 会分别记住 root 和当前选中的 sub-wiki，并把状态写入本地 state files 与 runtime registry。
+
 ### Three-Layer Architecture
 
 ```
@@ -44,19 +52,43 @@ vault/
 | **Query** | `/llm-wiki query <问题>` | 搜索相关页 → 综合答案 → 写入 output/ 并返回 |
 | **Lint** | `/llm-wiki lint` | 检查断链、孤儿页、过时内容、frontmatter 一致性 |
 | **Init** | `/llm-wiki init [vault路径]` | 初始化完整三层架构 |
+| **Root/Wiki Ops** | `bash scripts/init-vault.sh ...` | 设置 root、选择 sub-wiki、刷新 registry、运行 doctor/repair |
+
+### Runtime Commands
+
+```bash
+bash scripts/init-vault.sh --set-root /path/to/root
+bash scripts/init-vault.sh --remember /path/to/sub-wiki
+bash scripts/init-vault.sh --show-current
+bash scripts/init-vault.sh --doctor
+bash scripts/init-vault.sh --repair
+bash scripts/init-vault.sh --refresh-registry
+```
+
+### Runtime Registry
+
+Skill 维护一套控制平面运行时文件：
+- `runtime/wiki-structure.log.md`：人类可读的 sub-wiki 结构快照
+- `runtime/subwiki-registry.json`：机器可读 registry，包含分数、推荐候选、ambiguity notes
+- `runtime/wiki-events.log`：事件日志
 
 ### Vault Auto-Detection
 
-Skill 会按以下顺序检测 Obsidian vault 路径：
-1. 读取 Obsidian 配置文件 `obsidian.json` 中的 vault 路径
-2. 遍历常见位置查找包含 `.obsidian` 配置的目录
-3. iCloud 路径：`~/Library/Mobile Documents/com~apple~CloudDocs/Documents/`
+Skill 会按以下顺序检测路径：
+1. 已记住的 selected sub-wiki
+2. 已记住的 Obsidian root 下的子目录
+3. Obsidian 配置文件 `obsidian.json`
+4. 常见目录中的 wiki-shaped folders
+5. iCloud 路径
+
+检测结果会打分并排序；若有多个高分候选，会在输出中提示 ambiguity。
 
 ### Trigger Keywords
 
 - `/llm-wiki`
 - "知识库"、"LLM wiki"、"ingest"、"Obsidian"
 - "导入文档"、"构建知识库"、"知识管理"
+- "use this root"、"use this wiki"、"remember this root"、"switch wiki"
 
 ### Frontmatter Standard
 

@@ -116,6 +116,18 @@ Update these runtime files whenever the skill:
 
 The runtime registry is the skill's control-plane view of the wiki system; the per-wiki `log.md` remains the content-plane history inside each actual wiki.
 
+### Runtime Commands
+
+Use the helper wrapper at `scripts/init-vault.sh` for operational tasks:
+
+- `bash scripts/init-vault.sh --set-root /path/to/root`
+- `bash scripts/init-vault.sh --remember /path/to/sub-wiki`
+- `bash scripts/init-vault.sh --show-current`
+- `bash scripts/init-vault.sh --doctor`
+- `bash scripts/init-vault.sh --repair`
+- `bash scripts/init-vault.sh --refresh-registry`
+- `bash scripts/init-vault.sh --forget`
+
 For implementation and maintenance work on this skill, also consult `references/excellence-task-list.md`, which defines the full checklist for persistence, detection, registry sync, drift repair, health commands, and tests.
 
 ### Step 2: Initialize Vault Structure

@@ -9,7 +9,7 @@ The `llm-wiki` skill maintains a control-plane registry under `~/.hermes/skills/
   - Stores remembered root, selected sub-wiki, candidate count, candidate scores, markers, source hints, and shallow structure listings
 - `subwiki-registry.json`
   - Machine-readable registry for scripts and future agents
-  - Stores `remembered_root`, `selected_sub_wiki`, `candidate_count`, and an array of candidate objects with `path`, `score`, `markers`, `under_root`, `selected`, `last_seen`, `source_hints`, and `structure`
+  - Stores `schema_version`, `remembered_root`, `selected_sub_wiki`, `candidate_count`, `recommended_candidate`, `recommendation_reason`, ambiguity notes, and an array of candidate objects with `path`, `canonical_path`, `aliases`, `score`, `markers`, `under_root`, `selected`, `last_seen`, `source_hints`, and `structure`
 - `wiki-events.log`
   - Append-only event stream
   - Records detection, root changes, selected sub-wiki changes, initialization, refresh, repair, and forget actions with timestamps
