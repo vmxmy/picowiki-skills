@@ -1,0 +1,565 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import sys
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+from typing import Iterable
+
+HOME = Path.home()
+SCRIPT_DIR = Path(__file__).resolve().parent
+SKILL_DIR = Path(os.environ.get("HERMES_LLM_WIKI_SKILL_DIR", SCRIPT_DIR.parent)).resolve()
+STATE_DIR = Path(os.environ.get("HERMES_LLM_WIKI_STATE_DIR", HOME / ".hermes/state/llm-wiki")).resolve()
+SELECTED_VAULT_FILE = STATE_DIR / "selected-vault-path.txt"
+WIKI_ROOT_FILE = STATE_DIR / "wiki-root-path.txt"
+LAST_REFRESH_FILE = STATE_DIR / "last-refresh-at.txt"
+RUNTIME_DIR = Path(os.environ.get("HERMES_LLM_WIKI_RUNTIME_DIR", SKILL_DIR / "runtime")).resolve()
+REGISTRY_MD = RUNTIME_DIR / "wiki-structure.log.md"
+REGISTRY_JSON = RUNTIME_DIR / "subwiki-registry.json"
+EVENT_LOG = RUNTIME_DIR / "wiki-events.log"
+
+SEARCH_ROOTS = [
+    HOME,
+    HOME / "Documents",
+    HOME / ".hermes/obsidian",
+    HOME / "obsidian",
+    HOME / "Obsidian_Vault",
+]
+
+
+@dataclass
+class Candidate:
+    path: Path
+    markers: list[str]
+    score: int
+    source_hints: set[str]
+    structure: list[str]
+
+    def as_json(self, remembered_root: Path | None, selected: Path | None) -> dict:
+        path_str = str(self.path)
+        return {
+            "path": path_str,
+            "markers": self.markers,
+            "score": self.score,
+            "selected": selected is not None and self.path == selected,
+            "under_root": remembered_root is not None and is_under(self.path, remembered_root),
+            "last_seen": now_iso(),
+            "source_hints": sorted(self.source_hints),
+            "structure": self.structure,
+        }
+
+
+def now_human() -> str:
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def now_iso() -> str:
+    return datetime.now().isoformat(timespec="seconds")
+
+
+def ensure_dirs() -> None:
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+    EVENT_LOG.touch(exist_ok=True)
+
+
+def canonicalize(path: str | Path) -> Path:
+    p = Path(path).expanduser()
+    try:
+        return p.resolve(strict=False)
+    except Exception:
+        return p
+
+
+def read_state(path: Path) -> Path | None:
+    if not path.exists():
+        return None
+    content = path.read_text(encoding="utf-8").strip()
+    if not content:
+        return None
+    return canonicalize(content)
+
+
+def write_state(path: Path, value: Path) -> None:
+    ensure_dirs()
+    value = canonicalize(value)
+    path.write_text(f"{value}\n", encoding="utf-8")
+    saved = read_state(path)
+    if saved != value:
+        raise RuntimeError(f"failed to verify state file write: {path}")
+
+
+def clear_state(path: Path) -> None:
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        pass
+
+
+def append_event(action: str, details: str) -> None:
+    ensure_dirs()
+    with EVENT_LOG.open("a", encoding="utf-8") as fh:
+        fh.write(f"{now_human()} | {action} | {details}\n")
+
+
+def is_under(path: Path, parent: Path) -> bool:
+    try:
+        path.relative_to(parent)
+        return True
+    except ValueError:
+        return False
+
+
+def detect_markers(path: Path) -> list[str]:
+    markers: list[str] = []
+    if (path / ".obsidian").is_dir():
+        markers.append(".obsidian/")
+    for name in ["SCHEMA.md", "CLAUDE.md", "index.md", "INDEX.md", "log.md"]:
+        if (path / name).is_file():
+            markers.append(name)
+    for name in ["raw", "wiki", "output", "articles", "concepts"]:
+        if (path / name).is_dir():
+            markers.append(f"{name}/")
+    return markers
+
+
+def score_candidate(path: Path, markers: Iterable[str]) -> int:
+    marker_set = set(markers)
+    score = 0
+    if {"raw/", "wiki/"}.issubset(marker_set):
+        score += 60
+    if "SCHEMA.md" in marker_set:
+        score += 18
+    if "CLAUDE.md" in marker_set:
+        score += 16
+    if "index.md" in marker_set or "INDEX.md" in marker_set:
+        score += 14
+    if "log.md" in marker_set:
+        score += 12
+    if ".obsidian/" in marker_set:
+        score += 8
+    if "output/" in marker_set:
+        score += 4
+    if {"articles/", "concepts/"}.issubset(marker_set):
+        score += 22
+    if path.name == "vault":
+        score += 4
+    return score
+
+
+def has_real_wiki_markers(path: Path) -> bool:
+    markers = detect_markers(path)
+    return score_candidate(path, markers) >= 30
+
+
+def shallow_structure(path: Path) -> list[str]:
+    items: list[str] = []
+    for candidate in sorted(path.rglob("*")):
+        try:
+            rel = candidate.relative_to(path)
+        except ValueError:
+            continue
+        if len(rel.parts) > 2:
+            continue
+        rel_s = rel.as_posix()
+        if rel_s.startswith(".git/") or rel_s == ".git":
+            continue
+        if rel_s.startswith(".obsidian/workspace") or rel_s == ".obsidian/cache":
+            continue
+        if candidate.is_dir():
+            items.append(rel_s)
+        else:
+            items.append(rel_s)
+    return items
+
+
+def obsidian_config_candidates() -> list[Path]:
+    config_paths = [
+        HOME / "Library/Application Support/obsidian/obsidian.json",
+        HOME / ".obsidian/obsidian.json",
+        HOME / ".config/obsidian/obsidian.json",
+    ]
+    candidates: list[Path] = []
+    for config_path in config_paths:
+        if not config_path.exists():
+            continue
+        try:
+            data = json.loads(config_path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        vaults = data.get("vaults", {}) if isinstance(data, dict) else {}
+        if not isinstance(vaults, dict):
+            continue
+        for value in vaults.values():
+            if isinstance(value, dict) and value.get("path"):
+                candidates.append(canonicalize(value["path"]))
+    return candidates
+
+
+def add_candidate(store: dict[str, Candidate], path: Path, source_hint: str) -> None:
+    path = canonicalize(path)
+    if not path.is_dir():
+        return
+    markers = detect_markers(path)
+    score = score_candidate(path, markers)
+    if score < 30:
+        return
+    key = str(path)
+    if key in store:
+        store[key].source_hints.add(source_hint)
+        store[key].score = max(store[key].score, score)
+        return
+    store[key] = Candidate(
+        path=path,
+        markers=markers,
+        score=score,
+        source_hints={source_hint},
+        structure=shallow_structure(path),
+    )
+
+
+def collect_from_root(store: dict[str, Candidate], root: Path, source_hint: str) -> None:
+    if not root.is_dir():
+        return
+    for child in sorted(root.iterdir()):
+        if not child.is_dir():
+            continue
+        add_candidate(store, child, source_hint)
+        nested_vault = child / "vault"
+        if nested_vault.is_dir():
+            add_candidate(store, nested_vault, f"{source_hint}:nested-vault")
+
+
+def collect_candidates() -> tuple[list[Candidate], Path | None, Path | None]:
+    selected = read_state(SELECTED_VAULT_FILE)
+    root = read_state(WIKI_ROOT_FILE)
+    store: dict[str, Candidate] = {}
+
+    if selected and selected.is_dir():
+        add_candidate(store, selected, "state:selected")
+    if root and root.is_dir():
+        collect_from_root(store, root, "state:root")
+
+    for candidate in obsidian_config_candidates():
+        add_candidate(store, candidate, "obsidian-config")
+
+    for search_root in SEARCH_ROOTS:
+        if not search_root.is_dir():
+            continue
+        for candidate in search_root.glob("*"):
+            if not candidate.is_dir():
+                continue
+            if root and canonicalize(candidate) == root:
+                continue
+            add_candidate(store, candidate, f"search-root:{search_root.name or 'home'}")
+            nested_vault = candidate / "vault"
+            if nested_vault.is_dir():
+                add_candidate(store, nested_vault, f"search-root:{search_root.name or 'home'}:nested-vault")
+
+        for obsidian_dir in search_root.rglob(".obsidian"):
+            if len(obsidian_dir.relative_to(search_root).parts) > 4:
+                continue
+            parent = obsidian_dir.parent
+            if root and canonicalize(parent) == root:
+                continue
+            add_candidate(store, parent, f"scan-obsidian:{search_root.name or 'home'}")
+
+    icloud_root = HOME / "Library/Mobile Documents/iCloud~md~obsidian/Documents"
+    if icloud_root.is_dir():
+        collect_from_root(store, icloud_root, "icloud")
+
+    candidates = sorted(
+        store.values(),
+        key=lambda c: (
+            0 if selected and c.path == selected else 1,
+            0 if root and is_under(c.path, root) else 1,
+            -c.score,
+            str(c.path),
+        ),
+    )
+    return candidates, root, selected
+
+
+def refresh_registry() -> list[Candidate]:
+    ensure_dirs()
+    candidates, root, selected = collect_candidates()
+    LAST_REFRESH_FILE.write_text(f"{now_iso()}\n", encoding="utf-8")
+
+    lines = [
+        "# LLM Wiki Runtime Registry",
+        "",
+        f"- generated_at: {now_human()}",
+        f"- remembered_root: {root if root else 'none'}",
+        f"- selected_sub_wiki: {selected if selected else 'none'}",
+        f"- candidate_count: {len(candidates)}",
+        "",
+        "## Known Sub-Wikis",
+        "",
+    ]
+    if not candidates:
+        lines.append("_No sub-wikis discovered._")
+    else:
+        for candidate in candidates:
+            lines.append(f"### `{candidate.path}`")
+            lines.append(f"- score: {candidate.score}")
+            lines.append(f"- markers: {', '.join(candidate.markers) if candidate.markers else 'none'}")
+            lines.append(f"- selected: {'yes' if selected and candidate.path == selected else 'no'}")
+            lines.append(f"- under_remembered_root: {'yes' if root and is_under(candidate.path, root) else 'no'}")
+            lines.append(f"- source_hints: {', '.join(sorted(candidate.source_hints))}")
+            lines.append("- structure:")
+            for item in candidate.structure:
+                lines.append(f"  - {item}")
+            lines.append("")
+    REGISTRY_MD.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    payload = {
+        "generated_at": now_iso(),
+        "remembered_root": str(root) if root else None,
+        "selected_sub_wiki": str(selected) if selected else None,
+        "candidate_count": len(candidates),
+        "candidates": [c.as_json(root, selected) for c in candidates],
+    }
+    REGISTRY_JSON.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    append_event(
+        "refresh-registry",
+        f"count={len(candidates)} root={root if root else 'none'} selected={selected if selected else 'none'}",
+    )
+    return candidates
+
+
+def verify_candidate_relationships(root: Path | None, selected: Path | None) -> list[str]:
+    issues: list[str] = []
+    if root and not root.is_dir():
+        issues.append(f"remembered root does not exist: {root}")
+    if selected and not selected.is_dir():
+        issues.append(f"selected sub-wiki does not exist: {selected}")
+    if root and selected and selected.is_dir() and not is_under(selected, root):
+        issues.append(f"selected sub-wiki is not under remembered root: {selected}")
+    return issues
+
+
+def show_current() -> int:
+    candidates = refresh_registry()
+    root = read_state(WIKI_ROOT_FILE)
+    selected = read_state(SELECTED_VAULT_FILE)
+    print(f"remembered_root={root if root else 'none'}")
+    print(f"selected_sub_wiki={selected if selected else 'none'}")
+    print(f"candidate_count={len(candidates)}")
+    if candidates:
+        print("top_candidates=")
+        for candidate in candidates[:5]:
+            print(f"  - {candidate.path} (score={candidate.score})")
+    return 0
+
+
+def doctor() -> int:
+    candidates = refresh_registry()
+    root = read_state(WIKI_ROOT_FILE)
+    selected = read_state(SELECTED_VAULT_FILE)
+    issues = verify_candidate_relationships(root, selected)
+
+    print("LLM Wiki doctor report")
+    print(f"- remembered_root: {root if root else 'none'}")
+    print(f"- selected_sub_wiki: {selected if selected else 'none'}")
+    print(f"- candidate_count: {len(candidates)}")
+    print(f"- registry_markdown: {REGISTRY_MD}")
+    print(f"- registry_json: {REGISTRY_JSON}")
+    if LAST_REFRESH_FILE.exists():
+        print(f"- last_refresh_at: {LAST_REFRESH_FILE.read_text(encoding='utf-8').strip()}")
+
+    if issues:
+        print("- status: drift-detected")
+        for issue in issues:
+            print(f"  - {issue}")
+        return 1
+
+    if selected:
+        matching = any(candidate.path == selected for candidate in candidates)
+        if not matching:
+            print("- status: drift-detected")
+            print("  - selected sub-wiki is not present in runtime registry")
+            return 1
+
+    print("- status: healthy")
+    return 0
+
+
+def repair_state() -> int:
+    root = read_state(WIKI_ROOT_FILE)
+    selected = read_state(SELECTED_VAULT_FILE)
+    changes: list[str] = []
+
+    if root and not root.is_dir():
+        clear_state(WIKI_ROOT_FILE)
+        changes.append(f"cleared missing root {root}")
+        root = None
+    if selected and not selected.is_dir():
+        clear_state(SELECTED_VAULT_FILE)
+        changes.append(f"cleared missing selected sub-wiki {selected}")
+        selected = None
+
+    if selected and not root:
+        root = selected.parent
+        write_state(WIKI_ROOT_FILE, root)
+        changes.append(f"recovered root from selected sub-wiki parent {root}")
+
+    if root and selected and not is_under(selected, root):
+        inferred_root = selected.parent
+        write_state(WIKI_ROOT_FILE, inferred_root)
+        changes.append(f"updated root to selected sub-wiki parent {inferred_root}")
+        root = inferred_root
+
+    refresh_registry()
+    details = "; ".join(changes) if changes else "no changes required"
+    append_event("repair-state", details)
+    print(details)
+    return 0
+
+
+def remember_root(path_str: str) -> int:
+    root = canonicalize(path_str)
+    if not root.is_dir():
+        print(f"Wiki root path does not exist: {root}", file=sys.stderr)
+        return 1
+    write_state(WIKI_ROOT_FILE, root)
+    append_event("set-root", f"root={root}")
+    refresh_registry()
+    print(f"Remembered wiki root: {root}")
+    return 0
+
+
+def remember_subwiki(path_str: str) -> int:
+    path = canonicalize(path_str)
+    if not path.is_dir():
+        print(f"Sub-wiki path does not exist: {path}", file=sys.stderr)
+        return 1
+    if not has_real_wiki_markers(path):
+        print(f"Path does not look like a valid sub-wiki: {path}", file=sys.stderr)
+        return 1
+    write_state(SELECTED_VAULT_FILE, path)
+    append_event("remember-subwiki", f"sub_wiki={path}")
+    refresh_registry()
+    print(f"Remembered preferred sub-wiki: {path}")
+    return 0
+
+
+def forget_paths() -> int:
+    clear_state(WIKI_ROOT_FILE)
+    clear_state(SELECTED_VAULT_FILE)
+    append_event("forget", "cleared root and selected sub-wiki")
+    refresh_registry()
+    print("Cleared remembered wiki root and selected sub-wiki")
+    return 0
+
+
+def write_if_missing(path: Path, content: str) -> None:
+    if not path.exists():
+        path.write_text(content, encoding="utf-8")
+
+
+def initialize_subwiki(path_str: str) -> int:
+    path = canonicalize(path_str)
+    path.mkdir(parents=True, exist_ok=True)
+    for rel in [
+        "raw/assets",
+        "wiki/sources",
+        "wiki/concepts",
+        "wiki/entities",
+        "wiki/comparisons",
+        "output",
+    ]:
+        (path / rel).mkdir(parents=True, exist_ok=True)
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    write_if_missing(
+        path / "SCHEMA.md",
+        "# LLM Wiki Schema\n\nThis sub-wiki follows the llm-wiki layout with raw/, wiki/, output/, index.md, and log.md.\n",
+    )
+    write_if_missing(
+        path / "index.md",
+        "# Index\n\n## Sources\n\n## Concepts\n\n## Entities\n\n## Comparisons\n",
+    )
+    write_if_missing(
+        path / "log.md",
+        f"## [{today}] init | Initialized sub-wiki at {path}\n",
+    )
+
+    write_state(SELECTED_VAULT_FILE, path)
+    write_state(WIKI_ROOT_FILE, path.parent)
+    append_event("init-subwiki", f"sub_wiki={path} root={path.parent}")
+    refresh_registry()
+
+    print(f"Directories created at: {path}")
+    print(f"Remembered preferred sub-wiki: {path}")
+    print(f"Remembered wiki root: {path.parent}")
+    return 0
+
+
+def print_candidates() -> int:
+    candidates = refresh_registry()
+    print("Detecting sub-wikis...")
+    print("---")
+    if not candidates:
+        print("NO_VAULTS_FOUND")
+    else:
+        for index, candidate in enumerate(candidates, start=1):
+            print(f"{index}. {candidate.path} (score={candidate.score})")
+    append_event("detect", f"count={len(candidates)}")
+    return 0
+
+
+def usage() -> int:
+    print(
+        "Usage:\n"
+        "  init-vault.sh                      # auto-detect and print sub-wiki candidates\n"
+        "  init-vault.sh [sub-wiki-path]      # initialize a specific sub-wiki and remember it\n"
+        "  init-vault.sh --set-root PATH      # remember the parent obsidian root that stores sub-wikis\n"
+        "  init-vault.sh --remember PATH      # remember an existing preferred sub-wiki path\n"
+        "  init-vault.sh --refresh-registry   # rebuild the runtime registry/log snapshot\n"
+        "  init-vault.sh --show-current       # print current remembered root, selected sub-wiki, and top candidates\n"
+        "  init-vault.sh --doctor             # validate state and registry consistency\n"
+        "  init-vault.sh --repair             # repair safe state drift automatically\n"
+        "  init-vault.sh --forget             # clear remembered root and sub-wiki paths"
+    )
+    return 0
+
+
+def main(argv: list[str]) -> int:
+    ensure_dirs()
+    if not argv:
+        return print_candidates()
+
+    cmd = argv[0]
+    if cmd in {"-h", "--help"}:
+        return usage()
+    if cmd == "--set-root":
+        if len(argv) < 2:
+            print("missing path for --set-root", file=sys.stderr)
+            return 1
+        return remember_root(argv[1])
+    if cmd == "--remember":
+        if len(argv) < 2:
+            print("missing path for --remember", file=sys.stderr)
+            return 1
+        return remember_subwiki(argv[1])
+    if cmd == "--refresh-registry":
+        refresh_registry()
+        print(f"Refreshed runtime registry: {REGISTRY_MD}")
+        return 0
+    if cmd == "--show-current":
+        return show_current()
+    if cmd == "--doctor":
+        return doctor()
+    if cmd == "--repair":
+        return repair_state()
+    if cmd == "--forget":
+        return forget_paths()
+    return initialize_subwiki(cmd)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

@@ -38,20 +38,85 @@ vault/
 
 **Schema** — A document that tells the LLM how the wiki is structured, what conventions to follow, and what workflows to use. This is the key configuration — it makes the LLM a disciplined wiki maintainer rather than a generic chatbot. You and the LLM co-evolve this over time.
 
+## Obsidian Root vs Sub-Wiki
+
+In this setup, `obsidian/` is a **wiki root container**, not the wiki itself. It stores multiple sub-wikis.
+
+- **Wiki root container** — a parent directory such as `~/obsidian/` or `~/.hermes/obsidian/` that holds many sub-wiki folders
+- **Sub-wiki** — the actual wiki project directory the LLM works in, such as `~/obsidian/company-research/` or `~/.hermes/obsidian/llm-wiki/`
+
+Rules:
+
+1. Do **not** treat the remembered Obsidian root container as an active wiki unless it also has real wiki markers of its own.
+2. Prefer scanning subdirectories inside the remembered root container before falling back to broader home-directory discovery.
+3. Remember two things separately:
+   - the user's Obsidian root container path
+   - the currently selected sub-wiki path
+4. If a user says "obsidian is my wiki root" or equivalent, store that as the parent search root for all future sub-wiki discovery.
+
 ## Initialization Workflow
 
 ### Step 1: Detect Vault Path
 
-Search for existing Obsidian vaults on the user's system. Check these locations in order:
+Search for the user's actual active wiki/vault path before assuming a new default. Check these locations in order:
 
-1. **Obsidian config** (most reliable): Parse `~/.obsidian/obsidian.json` or `~/Library/Application Support/obsidian/obsidian.json` for `vaults` entries
-2. **Common directories**: `~/Documents/`, `~/`, home directory — look for folders containing `.obsidian/` subdirectory
-3. **iCloud sync**: `~/Library/Mobile Documents/iCloud~md~obsidian/Documents/`
-4. **Ask the user**: If no vault found, or the user wants a new one
+1. **Remembered selected sub-wiki**: if the user explicitly chose a sub-wiki before, prefer that path first. Persist it in durable memory and mirror it in `~/.hermes/state/llm-wiki/selected-vault-path.txt`.
+2. **Remembered Obsidian root container**: if the user configured a parent `obsidian/` directory that stores all sub-wikis, enumerate subdirectories under that root first. Persist it in durable memory and mirror it in `~/.hermes/state/llm-wiki/wiki-root-path.txt`.
+3. **Skill config / recent user context**: honor an injected wiki path, user-provided workspace path, or any path mentioned earlier in the session
+4. **Existing project/workspace wiki**: search the current workspace and likely vault subdirectories for an existing wiki root containing files like `INDEX.md`, `index.md`, `log.md`, `SCHEMA.md`, or `CLAUDE.md`, plus content folders such as `articles/`, `concepts/`, `wiki/`, or `raw/`
+5. **Obsidian config** (most reliable for vault discovery): parse `~/.obsidian/obsidian.json` or `~/Library/Application Support/obsidian/obsidian.json` for `vaults` entries
+6. **Common directories**: `~/Documents/`, `~/`, home directory — look for folders containing `.obsidian/` subdirectory
+7. **iCloud sync**: `~/Library/Mobile Documents/iCloud~md~obsidian/Documents/`
+8. **Ask the user**: if multiple candidates exist or the intended wiki is still ambiguous
 
-Use `find` with `-maxdepth 3 -name ".obsidian" -type d` to locate vaults efficiently. Do NOT do deep recursive searches — keep it fast.
+Use shallow searches first; avoid slow deep recursion unless necessary.
 
-Present found vaults to the user and confirm which one to use, or let them specify a new path.
+Important: some real-world wikis do **not** use the canonical `SCHEMA.md` + `index.md` layout. If you find an existing vault with its own schema file (for example `CLAUDE.md`) and established files like `INDEX.md` and `log.md`, treat that as the source of truth and follow its conventions instead of creating a parallel wiki at `~/wiki`.
+
+### Remembering the Preferred Wiki Folder
+
+When the user says things like "use this wiki", "remember this vault", or provides a canonical folder for future runs:
+
+1. Save the chosen sub-wiki path to durable memory so the preference survives across sessions.
+2. Mirror the same path into `~/.hermes/state/llm-wiki/selected-vault-path.txt` for local script-based discovery.
+3. If the user defines a parent Obsidian root container, also save it to durable memory and mirror it into `~/.hermes/state/llm-wiki/wiki-root-path.txt`.
+4. On later runs, validate remembered paths still exist before using them.
+5. If the remembered root or selected sub-wiki changes, update both memory and the state files immediately.
+
+Treat an explicit user choice as higher priority than auto-detected vaults.
+
+### Required Persistence on Explicit User Choice
+
+If the user says things like `use this root`, `use this wiki`, `remember this root`, `remember this wiki`, or otherwise explicitly designates a canonical path, the skill must do both of the following in the same turn:
+
+1. **Write durable memory**
+   - for a root container: save that the user's Obsidian root stores sub-wikis
+   - for a sub-wiki: save that this path is the currently preferred sub-wiki
+2. **Write local state files**
+   - root container → `~/.hermes/state/llm-wiki/wiki-root-path.txt`
+   - selected sub-wiki → `~/.hermes/state/llm-wiki/selected-vault-path.txt`
+
+Do not treat the task as complete if only one layer was updated. Memory and state files must stay in sync.
+
+### Skill-Side Registry and Real-Time Logging
+
+Besides the wiki's own `log.md`, maintain skill-level runtime files under `~/.hermes/skills/llm-wiki/runtime/`:
+
+- `wiki-structure.log.md` — current snapshot of all known sub-wikis, their markers, scores, and shallow directory structure
+- `subwiki-registry.json` — machine-readable registry for scripts and future agents
+- `wiki-events.log` — append-only operational log for detect, remember, initialize, refresh, repair, doctor, and forget events
+
+Update these runtime files whenever the skill:
+
+1. detects wiki candidates
+2. initializes a new sub-wiki
+3. remembers or changes the Obsidian root container
+4. remembers or changes the active sub-wiki
+5. runs an explicit refresh or health-check pass
+
+The runtime registry is the skill's control-plane view of the wiki system; the per-wiki `log.md` remains the content-plane history inside each actual wiki.
+
+For implementation and maintenance work on this skill, also consult `references/excellence-task-list.md`, which defines the full checklist for persistence, detection, registry sync, drift repair, health commands, and tests.
 
 ### Step 2: Initialize Vault Structure
 
