@@ -1,0 +1,31 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Hermes Agent — Multi-Tenant Docker Compose (Base File)
+#
+# Tenant services live in tenants/<name>/compose.yml and are auto-discovered
+# by ./hermesctl. DO NOT run `docker compose up` directly from this directory —
+# it will start zero services. Use ./hermesctl instead:
+#
+#   ./hermesctl up -d              # start all tenants
+#   ./hermesctl up -d alice        # start one tenant
+#   ./hermesctl ps                 # show status
+#   ./hermesctl logs -f alice      # tail logs
+#   ./hermesctl ls                 # list tenants + configured platforms
+#   ./hermesctl doctor             # validate config (ports, UIDs, keys)
+#   ./hermesctl config             # preview merged compose (debug)
+#
+# To add a tenant:
+#   ./add-tenant.sh <name>         # scaffolds tenants/<name>/ + compose fragment
+#   $EDITOR tenants/<name>/.env    # fill in bot tokens
+#   ./hermesctl up -d <name>
+#
+# To remove a tenant:
+#   ./remove-tenant.sh <name>      # stop + archive to tenants/.archive/
+#   ./remove-tenant.sh <name> --purge  # stop + permanent delete (with confirmation)
+#
+# See README.md for full documentation.
+# ─────────────────────────────────────────────────────────────────────────────
+name: hermes
+
+# services must be present (even empty) for the Compose parser to accept this file.
+# All real services are defined in tenants/<name>/compose.yml fragments.
+services: {}

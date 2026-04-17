@@ -1,0 +1,325 @@
+Split: 12 train, 8 test (holdout=0.4)
+
+============================================================
+Iteration 1/1
+Description: Operational guide for managing multi-tenant hermes-agent Docker instances using the deploy/ scripts (hermesctl, add-tenant.sh, remove-tenant.sh, weixin-pair.sh). Use this skill whenever the user asks about: starting or stopping hermes-agent containers, adding or removing tenants, viewing gateway logs, pairing messaging platforms (WeChat/Weixin, Telegram, Discord, Slack), running hermesctl commands, debugging container or env issues, reloading config after .env changes, or any operation involving the deploy/ directory. Trigger on keywords: hermesctl, hermes container, hermes tenant, add-tenant, remove-tenant, weixin-pair, gateway logs, docker exec hermes, hermes-agent instance, force-recreate hermes, hermes pairing, hermes doctor.
+============================================================
+Train: 6/12 correct, precision=100% recall=0% accuracy=50% (60.9s)
+  [PASS] rate=0/1 expected=False: write a new tool for hermes-agent that can summarize PDF att
+  [FAIL] rate=0/1 expected=True: add a new tenant called alice, she needs telegram and weixin
+  [PASS] rate=0/1 expected=False: how do I start Docker Desktop on my Mac, it keeps crashing o
+  [FAIL] rate=0/1 expected=True: I want to roll out a second hermes instance for the finance 
+  [FAIL] rate=0/1 expected=True: the bot in my hermes container says 'hermes: command not fou
+  [FAIL] rate=0/1 expected=True: weixin 扫码登录之后 gateway 没连上，要怎么排查
+  [FAIL] rate=0/1 expected=True: 帮我给 poc 容器跑一下 hermes doctor 看看有没有问题
+  [PASS] rate=0/1 expected=False: pair my new AirPods Pro with my MacBook, the bluetooth pairi
+  [PASS] rate=0/1 expected=False: I'm writing a Python script that calls the Anthropic API — h
+  [FAIL] rate=0/1 expected=True: list all the running hermes tenants and show which platforms
+  [PASS] rate=0/1 expected=False: what's the actual difference between docker restart and dock
+  [PASS] rate=0/1 expected=False: show me the last 100 lines of logs from my nginx reverse pro
+Test : 4/8 correct, precision=100% recall=0% accuracy=50% (0.0s)
+  [PASS] rate=0/1 expected=False: 我的微信公众号定时发文章失败了，后台报 48001 错误
+  [FAIL] rate=0/1 expected=True: hermes-agent 的 gateway 起不来，容器一启动就退出了，看不到日志
+  [FAIL] rate=0/1 expected=True: telegram pairing code 出来了是 85TC3GMF，怎么 approve
+  [PASS] rate=0/1 expected=False: generate a new Telegram bot token via BotFather for my proje
+  [PASS] rate=0/1 expected=False: create a skill that wraps hermesctl so I can run it from Cla
+  [PASS] rate=0/1 expected=False: docker compose up for my wordpress + mysql stack fails with 
+  [FAIL] rate=0/1 expected=True: 改了 poc 的 .env 加了个 ANTHROPIC_API_KEY 但重启之后好像没生效
+  [FAIL] rate=0/1 expected=True: how do I wipe the archived data for the old demo tenant? rm 
+
+Max iterations reached (1).
+
+Exit reason: max_iterations (1)
+Best score: 4/8 (iteration 1)
+{
+  "exit_reason": "max_iterations (1)",
+  "original_description": "Operational guide for managing multi-tenant hermes-agent Docker instances using the deploy/ scripts (hermesctl, add-tenant.sh, remove-tenant.sh, weixin-pair.sh). Use this skill whenever the user asks about: starting or stopping hermes-agent containers, adding or removing tenants, viewing gateway logs, pairing messaging platforms (WeChat/Weixin, Telegram, Discord, Slack), running hermesctl commands, debugging container or env issues, reloading config after .env changes, or any operation involving the deploy/ directory. Trigger on keywords: hermesctl, hermes container, hermes tenant, add-tenant, remove-tenant, weixin-pair, gateway logs, docker exec hermes, hermes-agent instance, force-recreate hermes, hermes pairing, hermes doctor.",
+  "best_description": "Operational guide for managing multi-tenant hermes-agent Docker instances using the deploy/ scripts (hermesctl, add-tenant.sh, remove-tenant.sh, weixin-pair.sh). Use this skill whenever the user asks about: starting or stopping hermes-agent containers, adding or removing tenants, viewing gateway logs, pairing messaging platforms (WeChat/Weixin, Telegram, Discord, Slack), running hermesctl commands, debugging container or env issues, reloading config after .env changes, or any operation involving the deploy/ directory. Trigger on keywords: hermesctl, hermes container, hermes tenant, add-tenant, remove-tenant, weixin-pair, gateway logs, docker exec hermes, hermes-agent instance, force-recreate hermes, hermes pairing, hermes doctor.",
+  "best_score": "4/8",
+  "best_train_score": "6/12",
+  "best_test_score": "4/8",
+  "final_description": "Operational guide for managing multi-tenant hermes-agent Docker instances using the deploy/ scripts (hermesctl, add-tenant.sh, remove-tenant.sh, weixin-pair.sh). Use this skill whenever the user asks about: starting or stopping hermes-agent containers, adding or removing tenants, viewing gateway logs, pairing messaging platforms (WeChat/Weixin, Telegram, Discord, Slack), running hermesctl commands, debugging container or env issues, reloading config after .env changes, or any operation involving the deploy/ directory. Trigger on keywords: hermesctl, hermes container, hermes tenant, add-tenant, remove-tenant, weixin-pair, gateway logs, docker exec hermes, hermes-agent instance, force-recreate hermes, hermes pairing, hermes doctor.",
+  "iterations_run": 1,
+  "holdout": 0.4,
+  "train_size": 12,
+  "test_size": 8,
+  "history": [
+    {
+      "iteration": 1,
+      "description": "Operational guide for managing multi-tenant hermes-agent Docker instances using the deploy/ scripts (hermesctl, add-tenant.sh, remove-tenant.sh, weixin-pair.sh). Use this skill whenever the user asks about: starting or stopping hermes-agent containers, adding or removing tenants, viewing gateway logs, pairing messaging platforms (WeChat/Weixin, Telegram, Discord, Slack), running hermesctl commands, debugging container or env issues, reloading config after .env changes, or any operation involving the deploy/ directory. Trigger on keywords: hermesctl, hermes container, hermes tenant, add-tenant, remove-tenant, weixin-pair, gateway logs, docker exec hermes, hermes-agent instance, force-recreate hermes, hermes pairing, hermes doctor.",
+      "train_passed": 6,
+      "train_failed": 6,
+      "train_total": 12,
+      "train_results": [
+        {
+          "query": "write a new tool for hermes-agent that can summarize PDF attachments sent via Telegram",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "add a new tenant called alice, she needs telegram and weixin",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "how do I start Docker Desktop on my Mac, it keeps crashing on launch",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "I want to roll out a second hermes instance for the finance team alongside the existing poc one \u2014 what's the process?",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "the bot in my hermes container says 'hermes: command not found' when I docker exec in",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "weixin \u626b\u7801\u767b\u5f55\u4e4b\u540e gateway \u6ca1\u8fde\u4e0a\uff0c\u8981\u600e\u4e48\u6392\u67e5",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u5e2e\u6211\u7ed9 poc \u5bb9\u5668\u8dd1\u4e00\u4e0b hermes doctor \u770b\u770b\u6709\u6ca1\u6709\u95ee\u9898",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "pair my new AirPods Pro with my MacBook, the bluetooth pairing dialog won't show up",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "I'm writing a Python script that calls the Anthropic API \u2014 how do I set up prompt caching to reduce costs?",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "list all the running hermes tenants and show which platforms each one has active",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "what's the actual difference between docker restart and docker compose restart?",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "show me the last 100 lines of logs from my nginx reverse proxy container",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        }
+      ],
+      "test_passed": 4,
+      "test_failed": 4,
+      "test_total": 8,
+      "test_results": [
+        {
+          "query": "\u6211\u7684\u5fae\u4fe1\u516c\u4f17\u53f7\u5b9a\u65f6\u53d1\u6587\u7ae0\u5931\u8d25\u4e86\uff0c\u540e\u53f0\u62a5 48001 \u9519\u8bef",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "hermes-agent \u7684 gateway \u8d77\u4e0d\u6765\uff0c\u5bb9\u5668\u4e00\u542f\u52a8\u5c31\u9000\u51fa\u4e86\uff0c\u770b\u4e0d\u5230\u65e5\u5fd7",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "telegram pairing code \u51fa\u6765\u4e86\u662f 85TC3GMF\uff0c\u600e\u4e48 approve",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "generate a new Telegram bot token via BotFather for my project",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "create a skill that wraps hermesctl so I can run it from Claude",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "docker compose up for my wordpress + mysql stack fails with 'port 3306 already in use'",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "\u6539\u4e86 poc \u7684 .env \u52a0\u4e86\u4e2a ANTHROPIC_API_KEY \u4f46\u91cd\u542f\u4e4b\u540e\u597d\u50cf\u6ca1\u751f\u6548",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "how do I wipe the archived data for the old demo tenant? rm -rf is giving permission denied on the data dir",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        }
+      ],
+      "passed": 6,
+      "failed": 6,
+      "total": 12,
+      "results": [
+        {
+          "query": "write a new tool for hermes-agent that can summarize PDF attachments sent via Telegram",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "add a new tenant called alice, she needs telegram and weixin",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "how do I start Docker Desktop on my Mac, it keeps crashing on launch",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "I want to roll out a second hermes instance for the finance team alongside the existing poc one \u2014 what's the process?",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "the bot in my hermes container says 'hermes: command not found' when I docker exec in",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "weixin \u626b\u7801\u767b\u5f55\u4e4b\u540e gateway \u6ca1\u8fde\u4e0a\uff0c\u8981\u600e\u4e48\u6392\u67e5",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u5e2e\u6211\u7ed9 poc \u5bb9\u5668\u8dd1\u4e00\u4e0b hermes doctor \u770b\u770b\u6709\u6ca1\u6709\u95ee\u9898",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "pair my new AirPods Pro with my MacBook, the bluetooth pairing dialog won't show up",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "I'm writing a Python script that calls the Anthropic API \u2014 how do I set up prompt caching to reduce costs?",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "list all the running hermes tenants and show which platforms each one has active",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "what's the actual difference between docker restart and docker compose restart?",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "show me the last 100 lines of logs from my nginx reverse proxy container",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        }
+      ]
+    }
+  ]
+}
+Report: /tmp/skill_description_report_hermes-ops_20260415_123424.html
+

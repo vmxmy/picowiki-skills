@@ -1,0 +1,81 @@
+Split: 12 train, 8 test (holdout=0.4)
+
+============================================================
+Iteration 1/5
+Description: Operational guide for managing multi-tenant hermes-agent Docker instances using the deploy/ scripts (hermesctl, add-tenant.sh, remove-tenant.sh, weixin-pair.sh). Use this skill whenever the user asks about: starting or stopping hermes-agent containers, adding or removing tenants, viewing gateway logs, pairing messaging platforms (WeChat/Weixin, Telegram, Discord, Slack), running hermesctl commands, debugging container or env issues, reloading config after .env changes, or any operation involving the deploy/ directory. Trigger on keywords: hermesctl, hermes container, hermes tenant, add-tenant, remove-tenant, weixin-pair, gateway logs, docker exec hermes, hermes-agent instance, force-recreate hermes, hermes pairing, hermes doctor.
+============================================================
+Train: 6/12 correct, precision=100% recall=0% accuracy=50% (48.5s)
+  [FAIL] rate=0/1 expected=True: add a new tenant called alice, she needs telegram and weixin
+  [PASS] rate=0/1 expected=False: I'm writing a Python script that calls the Anthropic API — h
+  [FAIL] rate=0/1 expected=True: I want to roll out a second hermes instance for the finance 
+  [PASS] rate=0/1 expected=False: write a new tool for hermes-agent that can summarize PDF att
+  [FAIL] rate=0/1 expected=True: the bot in my hermes container says 'hermes: command not fou
+  [FAIL] rate=0/1 expected=True: 帮我给 poc 容器跑一下 hermes doctor 看看有没有问题
+  [FAIL] rate=0/1 expected=True: list all the running hermes tenants and show which platforms
+  [FAIL] rate=0/1 expected=True: weixin 扫码登录之后 gateway 没连上，要怎么排查
+  [PASS] rate=0/1 expected=False: how do I start Docker Desktop on my Mac, it keeps crashing o
+  [PASS] rate=0/1 expected=False: pair my new AirPods Pro with my MacBook, the bluetooth pairi
+  [PASS] rate=0/1 expected=False: show me the last 100 lines of logs from my nginx reverse pro
+  [PASS] rate=0/1 expected=False: what's the actual difference between docker restart and dock
+Test : 4/8 correct, precision=100% recall=0% accuracy=50% (0.0s)
+  [FAIL] rate=0/1 expected=True: telegram pairing code 出来了是 85TC3GMF，怎么 approve
+  [FAIL] rate=0/1 expected=True: 改了 poc 的 .env 加了个 ANTHROPIC_API_KEY 但重启之后好像没生效
+  [FAIL] rate=0/1 expected=True: hermes-agent 的 gateway 起不来，容器一启动就退出了，看不到日志
+  [PASS] rate=0/1 expected=False: create a skill that wraps hermesctl so I can run it from Cla
+  [PASS] rate=0/1 expected=False: docker compose up for my wordpress + mysql stack fails with 
+  [FAIL] rate=0/1 expected=True: how do I wipe the archived data for the old demo tenant? rm 
+  [PASS] rate=0/1 expected=False: generate a new Telegram bot token via BotFather for my proje
+  [PASS] rate=0/1 expected=False: 我的微信公众号定时发文章失败了，后台报 48001 错误
+
+Improving description...
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/home/laoxu/.claude/plugins/cache/claude-plugins-official/skill-creator/unknown/skills/skill-creator/scripts/run_loop.py", line 332, in <module>
+    main()
+    ~~~~^^
+  File "/home/laoxu/.claude/plugins/cache/claude-plugins-official/skill-creator/unknown/skills/skill-creator/scripts/run_loop.py", line 297, in main
+    output = run_loop(
+        eval_set=eval_set,
+    ...<11 lines>...
+        log_dir=log_dir,
+    )
+  File "/home/laoxu/.claude/plugins/cache/claude-plugins-official/skill-creator/unknown/skills/skill-creator/scripts/run_loop.py", line 202, in run_loop
+    new_description = improve_description(
+        client=client,
+    ...<7 lines>...
+        iteration=iteration,
+    )
+  File "/home/laoxu/.claude/plugins/cache/claude-plugins-official/skill-creator/unknown/skills/skill-creator/scripts/improve_description.py", line 114, in improve_description
+    response = client.messages.create(
+        model=model,
+    ...<5 lines>...
+        messages=[{"role": "user", "content": prompt}],
+    )
+  File "/home/laoxu/.hermes/hermes-agent/.venv/lib/python3.13/site-packages/anthropic/_utils/_utils.py", line 283, in wrapper
+    return func(*args, **kwargs)
+  File "/home/laoxu/.hermes/hermes-agent/.venv/lib/python3.13/site-packages/anthropic/resources/messages/messages.py", line 996, in create
+    return self._post(
+           ~~~~~~~~~~^
+        "/v1/messages",
+        ^^^^^^^^^^^^^^^
+    ...<30 lines>...
+        stream_cls=Stream[RawMessageStreamEvent],
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/laoxu/.hermes/hermes-agent/.venv/lib/python3.13/site-packages/anthropic/_base_client.py", line 1368, in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+                           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/laoxu/.hermes/hermes-agent/.venv/lib/python3.13/site-packages/anthropic/_base_client.py", line 1062, in request
+    request = self._build_request(options, retries_taken=retries_taken)
+  File "/home/laoxu/.hermes/hermes-agent/.venv/lib/python3.13/site-packages/anthropic/_base_client.py", line 521, in _build_request
+    headers = self._build_headers(options, retries_taken=retries_taken)
+  File "/home/laoxu/.hermes/hermes-agent/.venv/lib/python3.13/site-packages/anthropic/_base_client.py", line 451, in _build_headers
+    self._validate_headers(headers_dict, custom_headers)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/laoxu/.hermes/hermes-agent/.venv/lib/python3.13/site-packages/anthropic/_client.py", line 196, in _validate_headers
+    raise TypeError(
+        '"Could not resolve authentication method. Expected either api_key or auth_token to be set. Or for one of the `X-Api-Key` or `Authorization` headers to be explicitly omitted"'
+    )
+TypeError: "Could not resolve authentication method. Expected either api_key or auth_token to be set. Or for one of the `X-Api-Key` or `Authorization` headers to be explicitly omitted"

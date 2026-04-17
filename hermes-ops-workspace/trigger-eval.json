@@ -1,0 +1,22 @@
+[
+  {"query": "add a new hermes tenant called alice, she needs telegram and weixin", "should_trigger": true},
+  {"query": "hermes weixin 扫码登录之后 gateway 没连上，要怎么排查", "should_trigger": true},
+  {"query": "改了 hermes poc 的 .env 加了个 ANTHROPIC_API_KEY 但重启之后好像没生效", "should_trigger": true},
+  {"query": "how do I wipe the archived data for the old hermes demo tenant? rm -rf is giving permission denied on the data dir", "should_trigger": true},
+  {"query": "the bot in my hermes container says 'hermes: command not found' when I docker exec in", "should_trigger": true},
+  {"query": "list all the running hermes tenants and show which platforms each one has active", "should_trigger": true},
+  {"query": "帮我给 poc 容器跑一下 hermes doctor 看看有没有问题", "should_trigger": true},
+  {"query": "hermes telegram pairing code 出来了是 85TC3GMF，怎么 approve", "should_trigger": true},
+  {"query": "hermes-agent 的 gateway 起不来，容器一启动就退出了，看不到日志", "should_trigger": true},
+  {"query": "I want to roll out a second hermes instance for the finance team alongside the existing poc one — what's the process?", "should_trigger": true},
+  {"query": "write a new tool for hermes-agent that can summarize PDF attachments sent via Telegram", "should_trigger": false},
+  {"query": "how do I start Docker Desktop on my Mac, it keeps crashing on launch", "should_trigger": false},
+  {"query": "generate a new Telegram bot token via BotFather for my project", "should_trigger": false},
+  {"query": "create a skill that wraps hermesctl so I can run it from Claude", "should_trigger": false},
+  {"query": "docker compose up for my wordpress + mysql stack fails with 'port 3306 already in use'", "should_trigger": false},
+  {"query": "我的微信公众号定时发文章失败了，后台报 48001 错误", "should_trigger": false},
+  {"query": "what's the actual difference between docker restart and docker compose restart?", "should_trigger": false},
+  {"query": "pair my new AirPods Pro with my MacBook, the bluetooth pairing dialog won't show up", "should_trigger": false},
+  {"query": "I'm writing a Python script that calls the Anthropic API — how do I set up prompt caching to reduce costs?", "should_trigger": false},
+  {"query": "show me the last 100 lines of logs from my nginx reverse proxy container", "should_trigger": false}
+]
